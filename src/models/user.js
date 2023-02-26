@@ -16,9 +16,9 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      unique: true,
       required: true,
       trim: true,
+      unique: true,
       lowerCase: true,
       validate(value) {
         if (!validator.isEmail(value)) {
@@ -30,10 +30,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      minLength: 7,
       validate(value) {
         if (value.toLowerCase().includes("password")) {
           throw new Error("Password cannot contain password");
+        } else if (String(value).length < 7) {
+          throw new Error("Length must be greater than 6");
         }
       },
     },
@@ -46,6 +47,19 @@ const userSchema = new mongoose.Schema(
         }
       },
     },
+    sessions: [
+      {
+        osname: {
+          type: String,
+        },
+        time: {
+          type: String,
+        },
+        model: {
+          type: String,
+        },
+      },
+    ],
     tokens: [
       {
         token: {
@@ -73,10 +87,11 @@ userSchema.methods.toJSON = function () {
   return userObject;
 };
 
-userSchema.methods.generateAuthToken = async function () {
+userSchema.methods.generateAuthToken = async function (osname, time, model) {
   const user = this;
   const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
 
+  user.sessions = user.sessions.concat({ osname, time, model });
   user.tokens = user.tokens.concat({ token });
   await user.save();
   return token;

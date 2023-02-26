@@ -69,34 +69,39 @@ router.get("/users/:id/avatar", async (req, res) => {
 router.post("/users", async (req, res) => {
   const user = new User(req.body);
   try {
-    const token = await user.generateAuthToken();
+    const { osname, time, model } = req.body;
+    const token = await user.generateAuthToken(osname, time, model);
     await user.save();
     // 201 -> created
     res.status(201).send({ user, token });
   } catch (error) {
     // 400 -> bad request (invalid data)
-    res.status(400).send(error);
+    res.status(400).send({ error: error.message });
   }
 });
 
 // login endpoint
 router.post("/users/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, osname, time, model } = req.body;
     const user = await User.findByCredentials(email, password);
-    const token = await user.generateAuthToken();
+    const token = await user.generateAuthToken(osname, time, model);
     res.send({ user, token });
   } catch (error) {
     // 400 -> bad request (invalid request)
-    res.status(400).send();
+    res.status(400).send({ error: error.message });
   }
 });
 
 // current session logout endPoint
 router.post("/users/logout", auth, async (req, res) => {
   try {
+    let idx = req.user.tokens.findIndex((x) => x.token === req.token);
     req.user.tokens = req.user.tokens.filter(
       (token) => token.token != req.token
+    );
+    req.user.sessions = req.user.sessions.filter(
+      (session, index) => index != idx
     );
     await req.user.save();
     res.send();
@@ -105,9 +110,37 @@ router.post("/users/logout", auth, async (req, res) => {
   }
 });
 
+//logOut By Session Id
+router.post("/users/logout/:id", auth, async (req, res) => {
+  const id = req.params.id;
+  try {
+    let idx = req.user.sessions.findIndex((x) => x._id.toString() === id);
+    req.user.tokens = req.user.tokens.filter((token, index) => index != idx);
+    req.user.sessions = req.user.sessions.filter(
+      (session, index) => index != idx
+    );
+    await req.user.save();
+    res.send();
+  } catch (e) {
+    res.status(500).send();
+  }
+});
+
+// get current session
+router.get("/users/currentSession/", auth, async (req, res) => {
+  try {
+    const token = req.header("Authorization").replace("Bearer ", "");
+    let idx = req.user.tokens.findIndex((x) => x.token === token);
+    res.send({ currentSessionIndex: req.user.tokens.length - (idx + 1) });
+  } catch (e) {
+    res.status(500).send();
+  }
+});
+
 // all session logout endPoint
 router.post("/users/logoutAll", auth, async (req, res) => {
   try {
+    req.user.sessions = [];
     req.user.tokens = [];
     await req.user.save();
     res.send();
@@ -145,7 +178,7 @@ router.patch("/users/me", auth, async (req, res) => {
     res.send(req.user);
   } catch (error) {
     // 400 -> bad request (invalid request)
-    return res.status(400).send(error);
+    return res.status(400).send(error.message);
   }
 });
 
