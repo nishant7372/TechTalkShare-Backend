@@ -6,7 +6,49 @@ const sharp = require("sharp");
 
 const router = new express.Router();
 
-// validating avatar upload
+// SignUp and LogIn EndPoints -------------------------------------------
+
+// user signup endpoint
+router.post("/users", async (req, res) => {
+  const user = new User(req.body);
+  try {
+    const { osname, browser, creationTime, model } = req.body;
+    const token = await user.generateAuthToken(
+      osname,
+      creationTime,
+      browser,
+      model
+    );
+    await user.save();
+    // 201 -> created
+    res.status(201).send({ user, token });
+  } catch (error) {
+    // 400 -> bad request (invalid data)
+    res.status(400).send({ error: error.message });
+  }
+});
+
+// user login endpoint
+router.post("/users/login", async (req, res) => {
+  try {
+    const { email, password, osname, browser, creationTime, model } = req.body;
+    const user = await User.findByCredentials(email, password);
+    const token = await user.generateAuthToken(
+      osname,
+      creationTime,
+      browser,
+      model
+    );
+    res.send({ user, token });
+  } catch (error) {
+    // 400 -> bad request (invalid request)
+    res.status(400).send({ error: error.message });
+  }
+});
+
+// Avatar Upload, Delete and Fetch Endpoint  -----------------------------
+
+// validating avatar upload using multer
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -20,7 +62,7 @@ const upload = multer({
   },
 });
 
-// avatar upload endpoint (with Authorization)
+// avatar upload endpoint (with Auth)
 router.post(
   "/users/me/avatar",
   auth,
@@ -39,7 +81,7 @@ router.post(
   }
 );
 
-// avatar delete endpoint (with Authorization)
+// avatar delete endpoint (with Auth)
 router.delete("/users/me/avatar", auth, async (req, res) => {
   try {
     req.user.avatar = undefined;
@@ -65,43 +107,14 @@ router.get("/users/:id/avatar", async (req, res) => {
   }
 });
 
-// user creation endpoint / signup endpoint
-router.post("/users", async (req, res) => {
-  const user = new User(req.body);
-  try {
-    const { osname, time, model } = req.body;
-    const token = await user.generateAuthToken(osname, time, model);
-    await user.save();
-    // 201 -> created
-    res.status(201).send({ user, token });
-  } catch (error) {
-    // 400 -> bad request (invalid data)
-    res.status(400).send({ error: error.message });
-  }
-});
-
-// login endpoint
-router.post("/users/login", async (req, res) => {
-  try {
-    const { email, password, osname, time, model } = req.body;
-    const user = await User.findByCredentials(email, password);
-    const token = await user.generateAuthToken(osname, time, model);
-    res.send({ user, token });
-  } catch (error) {
-    // 400 -> bad request (invalid request)
-    res.status(400).send({ error: error.message });
-  }
-});
+// LogOut Endpoints ------------------------------------------
 
 // current session logout endPoint
+
 router.post("/users/logout", auth, async (req, res) => {
   try {
-    let idx = req.user.tokens.findIndex((x) => x.token === req.token);
-    req.user.tokens = req.user.tokens.filter(
-      (token) => token.token != req.token
-    );
     req.user.sessions = req.user.sessions.filter(
-      (session, index) => index != idx
+      (session) => session.token != req.token
     );
     await req.user.save();
     res.send();
@@ -110,14 +123,13 @@ router.post("/users/logout", auth, async (req, res) => {
   }
 });
 
-//logOut By Session Id
+// logOut By Session Id endPoint (Multiple Sessions)
+
 router.post("/users/logout/:id", auth, async (req, res) => {
   const id = req.params.id;
   try {
-    let idx = req.user.sessions.findIndex((x) => x._id.toString() === id);
-    req.user.tokens = req.user.tokens.filter((token, index) => index != idx);
     req.user.sessions = req.user.sessions.filter(
-      (session, index) => index != idx
+      (session) => session._id.toString() != id
     );
     await req.user.save();
     res.send();
@@ -126,22 +138,13 @@ router.post("/users/logout/:id", auth, async (req, res) => {
   }
 });
 
-// get current session
-router.get("/users/currentSession/", auth, async (req, res) => {
-  try {
-    const token = req.header("Authorization").replace("Bearer ", "");
-    let idx = req.user.tokens.findIndex((x) => x.token === token);
-    res.send({ currentSessionIndex: req.user.tokens.length - (idx + 1) });
-  } catch (e) {
-    res.status(500).send();
-  }
-});
+// all other session logout endPoint
 
-// all session logout endPoint
-router.post("/users/logoutAll", auth, async (req, res) => {
+router.post("/users/logoutAllOther", auth, async (req, res) => {
   try {
-    req.user.sessions = [];
-    req.user.tokens = [];
+    req.user.sessions = req.user.sessions.filter(
+      (session) => session.token == req.token
+    );
     await req.user.save();
     res.send();
   } catch (e) {
@@ -149,8 +152,23 @@ router.post("/users/logoutAll", auth, async (req, res) => {
   }
 });
 
-// user reading endpoint
-// fetch current loggedin authorized user
+// current session reading endpoint
+
+router.get("/users/currentSession/", auth, async (req, res) => {
+  try {
+    const session = req.user.sessions.find(
+      (session) => session.token == req.token
+    );
+    res.send({ session_id: session.id });
+  } catch (e) {
+    res.status(500).send();
+  }
+});
+
+// User Read, Update and Delete ----------------------------------
+
+// user reading endpoint (Read Profile)
+
 router.get("/users/me", auth, async (req, res) => {
   try {
     res.send(req.user);
@@ -160,7 +178,8 @@ router.get("/users/me", auth, async (req, res) => {
   }
 });
 
-// single user updating endpoint
+// single user updating endpoint (Update user)
+
 router.patch("/users/me", auth, async (req, res) => {
   const updates = Object.keys(req.body);
   const allowedUpdates = ["name", "email", "password", "age"];
@@ -182,7 +201,8 @@ router.patch("/users/me", auth, async (req, res) => {
   }
 });
 
-// loggedin user delete endpoint
+// loggedin user delete endpoint (Delete User)
+
 router.delete("/users/me", auth, async (req, res) => {
   try {
     await req.user.remove();

@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       validate(value) {
         if (value.toLowerCase().includes("password")) {
-          throw new Error("Password cannot contain password");
+          throw new Error("Password cannot contain `password`");
         } else if (String(value).length < 7) {
           throw new Error("Length must be greater than 6");
         }
@@ -43,25 +43,29 @@ const userSchema = new mongoose.Schema(
       default: 0,
       validate(value) {
         if (value < 0) {
-          throw new Error("Age must be a positive number");
+          throw new Error("Age must be positive");
         }
       },
     },
     sessions: [
       {
-        osname: {
-          type: String,
+        session: {
+          osDetails: {
+            osname: {
+              type: String,
+              default: "unknown",
+            },
+            model: {
+              type: String,
+            },
+            browser: {
+              type: String,
+            },
+          },
+          creationTime: {
+            type: String,
+          },
         },
-        time: {
-          type: String,
-        },
-        model: {
-          type: String,
-        },
-      },
-    ],
-    tokens: [
-      {
         token: {
           type: String,
           required: true,
@@ -82,17 +86,25 @@ userSchema.methods.toJSON = function () {
   const user = this;
   const userObject = user.toObject();
 
-  delete userObject.tokens;
+  userObject.sessions.forEach((session) => {
+    delete session.token;
+  });
   delete userObject.password;
   return userObject;
 };
 
-userSchema.methods.generateAuthToken = async function (osname, time, model) {
+userSchema.methods.generateAuthToken = async function (
+  osname,
+  creationTime,
+  browser,
+  model
+) {
   const user = this;
   const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
 
-  user.sessions = user.sessions.concat({ osname, time, model });
-  user.tokens = user.tokens.concat({ token });
+  const osDetails = { osname, model, browser };
+  const session = { osDetails, creationTime };
+  user.sessions = user.sessions.concat({ session, token });
   await user.save();
   return token;
 };
@@ -128,6 +140,7 @@ userSchema.pre("remove", async function (next) {
   await Task.deleteMany({ owner: user._id });
   next();
 });
+
 const User = mongoose.model("User", userSchema);
 
 module.exports = User;
