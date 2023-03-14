@@ -33,8 +33,9 @@ router.post("/users", async (req, res) => {
 // user login endpoint
 router.post("/users/login", async (req, res) => {
   try {
-    const { email, password, osname, browser, creationTime, model } = req.body;
-    const user = await User.findByCredentials(email, password);
+    const { userName, password, osname, browser, creationTime, model } =
+      req.body;
+    const user = await User.findByCredentials(userName, password);
     const token = await user.generateAuthToken(
       osname,
       creationTime,
@@ -183,7 +184,7 @@ router.get("/users/me", auth, async (req, res) => {
 
 router.patch("/users/me", auth, async (req, res) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = ["name", "email", "password", "age"];
+  const allowedUpdates = ["name", "userName", "password", "age"];
   const isValidOperation = updates.every((update) =>
     allowedUpdates.includes(update)
   );
@@ -206,10 +207,6 @@ router.patch("/users/me", auth, async (req, res) => {
 
 router.delete("/users/me", auth, async (req, res) => {
   try {
-    const articles = await Article.find({ owner: req.user._id });
-    for (const article of articles) {
-      await Sharing.deleteMany({ article: article._id });
-    }
     await req.user.remove();
     res.send(req.user);
   } catch (error) {

@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
-const validator = require("validator");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const Task = require("./task");
+const Article = require("./article");
+const Sharing = require("./sharing");
 
 const userSchema = new mongoose.Schema(
   {
@@ -14,17 +14,12 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: Buffer,
     },
-    email: {
+    userName: {
       type: String,
       required: true,
       trim: true,
       unique: true,
       lowerCase: true,
-      validate(value) {
-        if (!validator.isEmail(value)) {
-          throw new Error("Badly Formatted Email");
-        }
-      },
     },
     password: {
       type: String,
@@ -77,12 +72,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.virtual("tasks", {
-  ref: "Task",
-  localField: "_id",
-  foreignField: "owner",
-});
-
 userSchema.virtual("articles", {
   ref: "Article",
   localField: "_id",
@@ -116,8 +105,8 @@ userSchema.methods.generateAuthToken = async function (
   return token;
 };
 
-userSchema.statics.findByCredentials = async (email, password) => {
-  const user = await User.findOne({ email });
+userSchema.statics.findByCredentials = async (userName, password) => {
+  const user = await User.findOne({ userName });
 
   if (!user) {
     throw new Error("Unable to login");
@@ -144,7 +133,11 @@ userSchema.pre("save", async function (next) {
 
 userSchema.pre("remove", async function (next) {
   const user = this;
-  await Task.deleteMany({ owner: user._id });
+  const articles = await Article.find({ owner: user._id });
+  for (const article of articles) {
+    await Sharing.deleteMany({ article: article._id });
+  }
+  await Article.deleteMany({ owner: user._id });
   next();
 });
 

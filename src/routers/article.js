@@ -117,13 +117,12 @@ router.patch("/articles/:id", auth, async (req, res) => {
 
 router.delete("/articles/:id", auth, async (req, res) => {
   try {
+    await Sharing.deleteMany({
+      article: req.params.id,
+    });
     const article = await Article.findOneAndDelete({
       _id: req.params.id,
       owner: req.user._id,
-    });
-
-    await Sharing.deleteMany({
-      article: req.parmas.id,
     });
 
     if (!article) {

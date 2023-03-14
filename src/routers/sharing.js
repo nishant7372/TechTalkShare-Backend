@@ -9,11 +9,11 @@ const router = new express.Router();
 // Article sharing point (with Auth)
 
 router.post("/articles/share", auth, async (req, res) => {
-  const { email, articleID } = req.body;
+  const { userName, articleID } = req.body;
   const sharedBy = req.user._id;
 
   try {
-    const sharedWithUser = await User.findOne({ email });
+    const sharedWithUser = await User.findOne({ userName });
     if (!sharedWithUser) {
       return res.status(404).send({ message: "User not found" });
     }
@@ -40,7 +40,7 @@ router.post("/articles/share", auth, async (req, res) => {
     if (existingSharing) {
       return res
         .status(400)
-        .send({ message: `Article already shared with ${email}` });
+        .send({ message: `Article already shared with ${userName}` });
     }
 
     const sharing = new Sharing({
@@ -83,17 +83,24 @@ router.get("/shared", auth, async (req, res) => {
       })
       .sort(sort);
 
-    let articles = sharing.map((share) => ({
-      ...share.toJSON(),
-      sharedBy: { name: share.sharedBy.name, email: share.sharedBy.email },
-      article: {
-        ...share.article.toJSON(),
-        owner: {
-          name: share.article.owner.name,
-          email: share.article.owner.email,
+    let articles = sharing;
+
+    if (articles) {
+      articles = sharing.map((share) => ({
+        ...share.toJSON(),
+        sharedBy: {
+          name: share.sharedBy.name,
+          userName: share.sharedBy.userName,
         },
-      },
-    }));
+        article: {
+          ...share.article.toJSON(),
+          owner: {
+            name: share.article.owner.name,
+            userName: share.article.owner.userName,
+          },
+        },
+      }));
+    }
 
     // searching by topic name
     if (req.query.search) {
