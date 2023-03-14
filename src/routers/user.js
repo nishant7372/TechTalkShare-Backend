@@ -3,6 +3,8 @@ const auth = require("../middleware/auth");
 const User = require("../models/user");
 const multer = require("multer");
 const sharp = require("sharp");
+const Sharing = require("../models/sharing");
+const Article = require("../models/article");
 
 const router = new express.Router();
 
@@ -24,7 +26,7 @@ router.post("/users", async (req, res) => {
     res.status(201).send({ user, token });
   } catch (error) {
     // 400 -> bad request (invalid data)
-    res.status(400).send({ error: error.message });
+    res.status(400).send({ message: error.message });
   }
 });
 
@@ -42,7 +44,7 @@ router.post("/users/login", async (req, res) => {
     res.send({ user, token });
   } catch (error) {
     // 400 -> bad request (invalid request)
-    res.status(400).send({ error: error.message });
+    res.status(400).send({ message: error.message });
   }
 });
 
@@ -77,7 +79,7 @@ router.post(
     res.send();
   },
   (error, req, res, next) => {
-    res.status(400).send({ error: error.message });
+    res.status(400).send({ message: error.message });
   }
 );
 
@@ -99,7 +101,6 @@ router.get("/users/:id/avatar", async (req, res) => {
     if (!user || !user.avatar) {
       throw new Error();
     }
-
     res.set("Content-Type", "image/png"); // by default application/json
     res.send(user.avatar);
   } catch (e) {
@@ -189,7 +190,7 @@ router.patch("/users/me", auth, async (req, res) => {
 
   if (!isValidOperation) {
     // 400 -> bad request (invalid request)
-    return res.status(400).send({ error: "Invalid Updates!" });
+    return res.status(400).send({ message: "Invalid Updates!" });
   }
   try {
     updates.forEach((update) => (req.user[update] = req.body[update]));
@@ -197,7 +198,7 @@ router.patch("/users/me", auth, async (req, res) => {
     res.send(req.user);
   } catch (error) {
     // 400 -> bad request (invalid request)
-    return res.status(400).send(error.message);
+    return res.status(400).send({ message: error.message });
   }
 });
 
@@ -205,6 +206,10 @@ router.patch("/users/me", auth, async (req, res) => {
 
 router.delete("/users/me", auth, async (req, res) => {
   try {
+    const articles = await Article.find({ owner: req.user._id });
+    for (const article of articles) {
+      await Sharing.deleteMany({ article: article._id });
+    }
     await req.user.remove();
     res.send(req.user);
   } catch (error) {

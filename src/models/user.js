@@ -64,6 +64,7 @@ const userSchema = new mongoose.Schema(
           },
           creationTime: {
             type: String,
+            required: true,
           },
         },
         token: {
@@ -78,6 +79,12 @@ const userSchema = new mongoose.Schema(
 
 userSchema.virtual("tasks", {
   ref: "Task",
+  localField: "_id",
+  foreignField: "owner",
+});
+
+userSchema.virtual("articles", {
+  ref: "Article",
   localField: "_id",
   foreignField: "owner",
 });

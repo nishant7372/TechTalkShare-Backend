@@ -1,7 +1,8 @@
 const express = require("express");
 require("./db/mongoose");
 const userRouter = require("./routers/user");
-const taskRouter = require("./routers/task");
+const articleRouter = require("./routers/article");
+const sharingRouter = require("./routers/sharing");
 
 const cors = require("cors");
 
@@ -12,7 +13,8 @@ app.use(cors());
 
 app.use(express.json()); // parse incoming json to object for accessing it in request handlers
 app.use(userRouter); // registering user router
-app.use(taskRouter); // registering task router
+app.use(articleRouter); // regstering article router
+app.use(sharingRouter); // regstering sharing router
 
 app.listen(port, () => {
   console.log("Server is up on the port " + port);
