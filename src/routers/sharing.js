@@ -9,7 +9,7 @@ const router = new express.Router();
 // Article sharing point (with Auth)
 
 router.post("/articles/share", auth, async (req, res) => {
-  const { userName, articleID } = req.body;
+  const { userName, articleID, writePermission } = req.body;
   const sharedBy = req.user._id;
 
   try {
@@ -47,6 +47,7 @@ router.post("/articles/share", auth, async (req, res) => {
       article: articleID,
       sharedWith: sharedWithUser._id,
       sharedBy,
+      writePermission,
     });
 
     await sharing.save();
@@ -160,6 +161,36 @@ router.get("/shared/:id", auth, async (req, res) => {
     res.send(article);
   } catch (error) {
     res.status(500).send();
+  }
+});
+
+// single shared article updating endpoint (with Auth)
+
+router.patch("/shared/:id", auth, async (req, res) => {
+  const updates = Object.keys(req.body);
+  const allowedUpdates = ["topic", "content", "tags", "votes"];
+
+  const isValidUpdate = updates.every((update) =>
+    allowedUpdates.includes(update)
+  );
+
+  if (!isValidUpdate) {
+    return res.status(400).send({ error: "Invalid Updates!" });
+  }
+
+  try {
+    const article = await Article.findOne({
+      _id: req.params.id,
+    });
+
+    if (!article) {
+      return res.status(404).send();
+    }
+    updates.forEach((update) => (article[update] = req.body[update]));
+    await article.save();
+    res.send(article);
+  } catch (error) {
+    return res.status(400).send(error);
   }
 });
 
