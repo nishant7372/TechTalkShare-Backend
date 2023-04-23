@@ -10,6 +10,10 @@ const router = new express.Router();
 
 // SignUp and LogIn EndPoints -------------------------------------------
 
+router.get("/dummy", async (req, res) => {
+  res.send("hello, server is working");
+});
+
 // user signup endpoint
 router.post("/users", async (req, res) => {
   const user = new User(req.body);
