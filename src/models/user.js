@@ -82,9 +82,11 @@ userSchema.methods.toJSON = function () {
   const user = this;
   const userObject = user.toObject();
 
-  userObject.sessions.forEach((session) => {
-    delete session.token;
-  });
+  if (userObject.sessions) {
+    userObject.sessions.forEach((session) => {
+      delete session.token;
+    });
+  }
   delete userObject.password;
   return userObject;
 };

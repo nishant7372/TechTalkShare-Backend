@@ -219,4 +219,15 @@ router.delete("/users/me", auth, async (req, res) => {
   }
 });
 
+// users fetch endpoint
+
+router.get("/users", auth, async (req, res) => {
+  try {
+    const users = await User.find({}, "name userName avatar");
+    res.send(users);
+  } catch (error) {
+    res.status(404).send();
+  }
+});
+
 module.exports = router;

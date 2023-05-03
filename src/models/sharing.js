@@ -21,6 +21,10 @@ const sharingSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    sharePermission: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

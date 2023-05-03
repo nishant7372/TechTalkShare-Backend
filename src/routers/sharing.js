@@ -9,7 +9,7 @@ const router = new express.Router();
 // Article sharing point (with Auth)
 
 router.post("/articles/share", auth, async (req, res) => {
-  const { userName, articleID, writePermission } = req.body;
+  const { userName, articleID, writePermission, sharePermission } = req.body;
   const sharedBy = req.user._id;
 
   try {
@@ -48,8 +48,8 @@ router.post("/articles/share", auth, async (req, res) => {
       sharedWith: sharedWithUser._id,
       sharedBy,
       writePermission,
+      sharePermission,
     });
-
     await sharing.save();
     res.status(201).send(sharing);
   } catch (error) {
@@ -154,11 +154,15 @@ router.get("/shared", auth, async (req, res) => {
 router.get("/shared/:id", auth, async (req, res) => {
   const { id } = req.params;
   try {
+    const sharing = await Sharing.findOne({
+      sharedWith: req.user._id,
+      article: id,
+    });
     const article = await Article.findOne({ _id: id });
     if (!article) {
       return res.status(404).send();
     }
-    res.send(article);
+    res.send({ article, sharing });
   } catch (error) {
     res.status(500).send();
   }
