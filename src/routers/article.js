@@ -2,7 +2,7 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const Article = require("../models/article");
 const Sharing = require("./../models/sharing");
-const { chromium } = require("playwright");
+const puppeteer = require("puppeteer");
 
 const router = new express.Router();
 
@@ -135,14 +135,14 @@ router.delete("/articles/:id", auth, async (req, res) => {
   }
 });
 
+// retrieve leetcode discuss content using url
 router.get("/scrape", async (req, res) => {
   try {
-    const url =
-      "https://leetcode.com/discuss/compensation/2748640/300-company-compensation-for-freshers-in-india-2022-2023";
-    const browser = await chromium.launch();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    await page.goto(url);
+    const browser = await puppeteer.launch({ headless: "new" });
+    const page = await browser.newPage();
+    await page.goto(
+      "https://leetcode.com/discuss/compensation/2748640/300-company-compensation-for-freshers-in-india-2022-2023"
+    );
 
     // Wait for the desired element to become available
     await page.waitForSelector("div.discuss-markdown-container");
