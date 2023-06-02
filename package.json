@@ -19,7 +19,7 @@
     "env-cmd": "^10.1.0",
     "nodemon": "^2.0.20"
   },
-  "name": "task-manager",
+  "name": "devstore-backend",
   "version": "1.0.0",
   "main": "index.js",
   "keywords": [],
