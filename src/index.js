@@ -40,4 +40,4 @@ setInterval(() => {
   });
 
   req.end();
-}, 1000); // Send the dummy request every second
+}, 10000); // Send the dummy request every second
