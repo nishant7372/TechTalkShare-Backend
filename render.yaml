@@ -1,0 +1,4 @@
+buildCommand: npm install
+startCommand: node src/index.js
+language: node
+nodeVersion: 20.2
