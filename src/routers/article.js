@@ -135,7 +135,7 @@ router.delete("/articles/:id", auth, async (req, res) => {
   }
 });
 
-router.get("/getLeetcodeDiscuss", async (req, res) => {
+router.get("/scrape", async (req, res) => {
   try {
     const url =
       "https://leetcode.com/discuss/compensation/2748640/300-company-compensation-for-freshers-in-india-2022-2023";
