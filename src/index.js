@@ -24,7 +24,6 @@ app.listen(port, () => {
 setInterval(() => {
   const options = {
     hostname: "prostore-backend.onrender.com",
-    port: port,
     path: "/dummy",
     method: "GET",
     timeout: 5000,
@@ -48,4 +47,4 @@ setInterval(() => {
   req.setTimeout(5000); // Set the timeout for the request
 
   req.end();
-}, 10000); // Send the dummy request every second
+}, 5 * 60 * 1000); // Send the dummy request every 5 min
