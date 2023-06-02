@@ -148,16 +148,20 @@ router.get("/scrape", async (req, res) => {
     // Set a longer navigation timeout (e.g., 60 seconds)
     page.setDefaultNavigationTimeout(60000);
 
-    await page.goto(
-      "https://leetcode.com/discuss/compensation/2748640/300-company-compensation-for-freshers-in-india-2022-2023"
-    );
+    await page.goto(req.query.url);
 
     // Wait for the desired element to become available
-    await page.waitForSelector("div.discuss-markdown-container");
+    await page.waitForSelector(".discuss-markdown-container");
+
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (request.resourceType() === "image") request.abort();
+      else request.continue();
+    });
 
     // Extract the HTML content of the desired element
     const discussContent = await page.$eval(
-      "div.discuss-markdown-container",
+      ".discuss-markdown-container",
       (element) => element.innerHTML
     );
 
