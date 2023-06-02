@@ -27,6 +27,7 @@ setInterval(() => {
     port: port,
     path: "/dummy",
     method: "GET",
+    timeout: 5000,
   };
 
   const req = http.request(options, (res) => {
@@ -35,9 +36,16 @@ setInterval(() => {
     );
   });
 
+  req.on("timeout", () => {
+    console.error("Socket connection timed out");
+    req.destroy(); // Close the connection
+  });
+
   req.on("error", (error) => {
     console.error("Error sending heartbeat request:", error);
   });
+
+  req.setTimeout(5000); // Set the timeout for the request
 
   req.end();
 }, 10000); // Send the dummy request every second
