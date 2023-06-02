@@ -159,6 +159,7 @@ router.get("/scrape", async (req, res) => {
     await browser.close();
     res.send(discussContent);
   } catch (error) {
+    console.log(error);
     res.status(500).send("An error occurred");
   }
 });
