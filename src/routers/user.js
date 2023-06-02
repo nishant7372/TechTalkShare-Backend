@@ -3,8 +3,6 @@ const auth = require("../middleware/auth");
 const User = require("../models/user");
 const multer = require("multer");
 const sharp = require("sharp");
-const Sharing = require("../models/sharing");
-const Article = require("../models/article");
 
 const router = new express.Router();
 
