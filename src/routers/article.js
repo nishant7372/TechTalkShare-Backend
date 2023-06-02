@@ -2,7 +2,7 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const Article = require("../models/article");
 const Sharing = require("./../models/sharing");
-const puppeteer = require("puppeteer");
+const PCR = require("puppeteer-chromium-resolver");
 
 const router = new express.Router();
 
@@ -135,22 +135,27 @@ router.delete("/articles/:id", auth, async (req, res) => {
   }
 });
 
-// retrieve leetcode discuss content using url
 router.get("/scrape", async (req, res) => {
   try {
-    const browser = await puppeteer.launch({ headless: "new" });
+    const options = {};
+    const stats = await PCR(options);
+    const browser = await stats.puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox"],
+      executablePath: stats.executablePath,
+    });
     const page = await browser.newPage();
+
     await page.setUserAgent(
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
     );
+
     await page.goto(
       "https://leetcode.com/discuss/compensation/2748640/300-company-compensation-for-freshers-in-india-2022-2023"
     );
 
-    // Wait for the desired element to become available
     await page.waitForSelector("div.discuss-markdown-container");
 
-    // Extract the HTML content of the desired element
     const discussContent = await page.$eval(
       "div.discuss-markdown-container",
       (element) => element.innerHTML
