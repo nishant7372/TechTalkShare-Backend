@@ -20,6 +20,10 @@ const articleSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
+    downloaded: {
+      type: Boolean,
+      default: false,
+    },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
