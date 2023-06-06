@@ -3,6 +3,7 @@ require("./db/mongoose");
 const userRouter = require("./routers/user");
 const articleRouter = require("./routers/article");
 const sharingRouter = require("./routers/sharing");
+const downloadRouter = require("./routers/download");
 
 const http = require("http");
 const cors = require("cors");
@@ -16,8 +17,9 @@ app.use(express.json()); // parse incoming json to object for accessing it in re
 app.use(userRouter); // registering user router
 app.use(articleRouter); // regstering article router
 app.use(sharingRouter); // regstering sharing router
+app.use(downloadRouter); // registering download Router
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log("Server is up on the port " + port);
 });
 
@@ -26,7 +28,6 @@ setInterval(() => {
     hostname: "prostore-backend.onrender.com",
     path: "/dummy",
     method: "GET",
-    timeout: 5000,
   };
 
   const req = http.request(options, (res) => {
@@ -35,16 +36,9 @@ setInterval(() => {
     );
   });
 
-  req.on("timeout", () => {
-    console.error("Socket connection timed out");
-    req.destroy(); // Close the connection
-  });
-
   req.on("error", (error) => {
     console.error("Error sending heartbeat request:", error);
   });
-
-  req.setTimeout(5000); // Set the timeout for the request
 
   req.end();
 }, 5 * 60 * 1000); // Send the dummy request every 5 min
