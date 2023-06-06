@@ -5,6 +5,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "bull": "^4.10.4",
     "chromium": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^4.18.2",
@@ -17,6 +18,8 @@
     "puppeteer-chromium-resolver": "^20.0.0",
     "puppeteer-core": "^20.5.0",
     "sharp": "^0.31.3",
+    "turndown": "^7.1.2",
+    "valid-url": "^1.0.9",
     "validator": "^13.9.0"
   },
   "devDependencies": {
