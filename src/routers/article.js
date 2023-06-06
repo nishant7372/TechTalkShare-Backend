@@ -2,10 +2,15 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const Article = require("../models/article");
 const Sharing = require("./../models/sharing");
+const Download = require("./../models/download");
 const puppeteer = require("puppeteer-core");
 const chromium = require("chromium");
-
 const router = new express.Router();
+const validUrl = require("valid-url");
+const TurndownService = require("turndown");
+
+// Create a new instance of TurndownService
+const turndownService = new TurndownService();
 
 // article creation endpoint (with Auth)
 
@@ -136,41 +141,149 @@ router.delete("/articles/:id", auth, async (req, res) => {
   }
 });
 
-router.get("/scrape", async (req, res) => {
+const scrapeQueue = [];
+let isScraping = false;
+
+router.get("/scrape", auth, async (req, res) => {
   try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: chromium.path,
-      args: ["--no-sandbox"],
+    // --------------------  Validate and sanitize the URL
+    const url = sanitizeUrl(req.query.url);
+    if (!isValidUrl(url)) {
+      return res.status(400).send("Invalid URL");
+    }
+
+    // -------------------- creating a download record
+
+    const download = new Download({
+      topic: url,
+      status: "downloading",
+      owner: req.user._id,
     });
 
-    const page = await browser.newPage();
-    // Set a longer navigation timeout (e.g., 60 seconds)
-    page.setDefaultNavigationTimeout(60000);
+    await download.save();
 
-    await page.goto(req.query.url);
+    scrapeQueue.push({ url, downloadId: download._id, res });
 
-    // Wait for the desired element to become available
-    await page.waitForSelector(".discuss-markdown-container");
-
-    await page.setRequestInterception(true);
-    page.on("request", (request) => {
-      if (request.resourceType() === "image") request.abort();
-      else request.continue();
-    });
-
-    // Extract the HTML content of the desired element
-    const discussContent = await page.$eval(
-      ".discuss-markdown-container",
-      (element) => element.innerHTML
-    );
-
-    await browser.close();
-    res.send(discussContent);
+    if (!isScraping) {
+      isScraping = true;
+      await processScrapeQueue(req.user._id);
+    }
   } catch (error) {
-    console.log(error);
-    res.status(500).send("An error occurred");
+    res.status(500).send("Unable to download");
   }
 });
+
+const processScrapeQueue = async (userId) => {
+  // console.log("tasks left", scrapeQueue.length);
+  if (scrapeQueue.length === 0) {
+    isScraping = false;
+    return;
+  }
+
+  const { url, downloadId, res } = scrapeQueue[0];
+
+  try {
+    // ----------------  scraping article from leetcode
+
+    const { content, topic } = await scrape(url);
+
+    const article = new Article({
+      topic,
+      content,
+      tags: [],
+      downloaded: true,
+      owner: userId,
+    });
+
+    await article.save();
+
+    // update the download status
+    await Download.findByIdAndUpdate(downloadId, { status: "downloaded" });
+
+    console.log("done");
+    res.status(201).send("done");
+
+    // remove the processed request from the queue
+    scrapeQueue.shift();
+
+    await delay(5000);
+
+    await processScrapeQueue(userId);
+  } catch (error) {
+    // update the status of download to error
+    console.log(error);
+    await Download.findByIdAndUpdate(downloadId, { status: "error" });
+    console.log("error");
+    res.status(201).send("error");
+
+    // remove the processed request from the queue
+    scrapeQueue.shift();
+
+    await processScrapeQueue(userId);
+  }
+};
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const scrape = async (url) => {
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: chromium.path,
+    args: ["--no-sandbox"],
+  });
+
+  const page = await browser.newPage();
+
+  page.setDefaultNavigationTimeout(60000); //navigation timeout (60 seconds)
+
+  await page.goto(url);
+
+  // Wait for the desired elements to become available
+  await Promise.all([
+    page.waitForSelector(".discuss-markdown-container"),
+    page.waitForSelector(".css-w6djpe-Title"),
+  ]);
+
+  await page.setRequestInterception(true);
+
+  page.on("request", (request) => {
+    if (request.resourceType() === "image") request.abort();
+    else request.continue();
+  });
+
+  // Extract the HTML content of the desired elements
+  const [content, topic] = await Promise.all([
+    page.$eval(".discuss-markdown-container", (element) => element.innerHTML),
+    page.$eval(".css-w6djpe-Title", (element) => element.innerHTML),
+  ]);
+
+  await browser.close();
+
+  // HTML string to be converted
+  const html = content;
+
+  // Convert HTML to Markdown
+  const markdown = turndownService.turndown(html);
+
+  return { content: markdown, topic };
+};
+
+// Function to validate URL
+const isValidUrl = (url) => validUrl.isWebUri(url);
+
+// Function to sanitize URL
+const sanitizeUrl = (url) => {
+  let sanitizedUrl = url.trim();
+
+  // Add "https://" prefix if missing
+  if (
+    !sanitizedUrl.startsWith("http://") &&
+    !sanitizedUrl.startsWith("https://")
+  ) {
+    sanitizedUrl = "https://" + sanitizedUrl;
+  }
+
+  return sanitizedUrl;
+};
 
 module.exports = router;
