@@ -156,26 +156,16 @@ router.post("/users/logoutAllOther", auth, async (req, res) => {
   }
 });
 
-// current session reading endpoint
-
-router.get("/users/currentSession/", auth, async (req, res) => {
-  try {
-    const session = req.user.sessions.find(
-      (session) => session.token == req.token
-    );
-    res.send({ session_id: session.id });
-  } catch (e) {
-    res.status(500).send();
-  }
-});
-
 // User Read, Update and Delete ----------------------------------
 
 // user reading endpoint (Read Profile)
 
 router.get("/users/me", auth, async (req, res) => {
   try {
-    res.send(req.user);
+    const session = req.user.sessions.find(
+      (session) => session.token == req.token
+    );
+    res.send({ user: req.user, currentSessionId: session.id });
   } catch (error) {
     // internal server error / server down
     res.status(500).send();

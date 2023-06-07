@@ -87,7 +87,9 @@ userSchema.methods.toJSON = function () {
       delete session.token;
     });
   }
+
   delete userObject.password;
+
   return userObject;
 };
 
