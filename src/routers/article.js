@@ -7,10 +7,9 @@ const puppeteer = require("puppeteer-core");
 const chromium = require("chromium");
 const router = new express.Router();
 const validUrl = require("valid-url");
-const TurndownService = require("turndown");
+const html2md = require("html-to-md");
 
-// Create a new instance of TurndownService
-const turndownService = new TurndownService();
+const obj = require("./../index");
 
 // article creation endpoint (with Auth)
 
@@ -142,48 +141,61 @@ router.delete("/articles/:id", auth, async (req, res) => {
 });
 
 const scrapeQueue = [];
+const activeDownloads = [];
 let isScraping = false;
+
+process.setMaxListeners(1000);
 
 router.get("/scrape", auth, async (req, res) => {
   try {
-    // --------------------  Validate and sanitize the URL
     const url = sanitizeUrl(req.query.url);
     if (!isValidUrl(url)) {
       return res.status(400).send("Invalid URL");
     }
+    const socketId = req.query.socketId;
+    const socketClient = obj.connectedClients[socketId];
 
-    // -------------------- creating a download record
-
-    const download = new Download({
+    activeDownloads.push({
+      updatedAt: new Date().toISOString(),
       topic: url,
-      status: "downloading",
+      status: "queued",
       owner: req.user._id,
     });
 
-    await download.save();
+    socketClient.emit("downloadStatus", {
+      type: "SUCCESS",
+      status: "Download Queued",
+      activeDownloads,
+    });
 
-    scrapeQueue.push({ url, downloadId: download._id, res });
+    scrapeQueue.push({ url, socketClient, owner: req.user._id });
 
     if (!isScraping) {
       isScraping = true;
-      await processScrapeQueue(req.user._id);
+      await processScrapeQueue();
     }
+    res.status(200).send({ status: "No active downloads" });
   } catch (error) {
     res.status(500).send("Unable to download");
   }
 });
 
-const processScrapeQueue = async (userId) => {
-  // console.log("tasks left", scrapeQueue.length);
+const processScrapeQueue = async () => {
   if (scrapeQueue.length === 0) {
     isScraping = false;
     return;
   }
 
-  const { url, downloadId, res } = scrapeQueue[0];
+  const { url, socketClient, owner } = scrapeQueue[0];
 
   try {
-    // ----------------  scraping article from leetcode
+    activeDownloads[0].status = "downloading";
+
+    socketClient.emit("downloadStatus", {
+      type: "SUCCESS",
+      status: "Article Downloading",
+      activeDownloads,
+    });
 
     const { content, topic } = await scrape(url);
 
@@ -192,38 +204,55 @@ const processScrapeQueue = async (userId) => {
       content,
       tags: [],
       downloaded: true,
-      owner: userId,
+      owner,
     });
 
     await article.save();
 
-    // update the download status
-    await Download.findByIdAndUpdate(downloadId, { status: "downloaded" });
+    activeDownloads[0].status = "downloaded";
 
-    console.log("done");
-    res.status(201).send("done");
+    socketClient.emit("downloadStatus", {
+      type: "SUCCESS",
+      status: "Article Downloaded",
+      activeDownloads,
+    });
 
-    // remove the processed request from the queue
+    activeDownloads.shift();
+
+    const download = new Download({
+      topic: url,
+      status: "downloaded",
+      owner,
+    });
+
+    await download.save();
+
     scrapeQueue.shift();
 
-    await delay(5000);
-
-    await processScrapeQueue(userId);
+    await processScrapeQueue();
   } catch (error) {
-    // update the status of download to error
-    console.log(error);
-    await Download.findByIdAndUpdate(downloadId, { status: "error" });
-    console.log("error");
-    res.status(201).send("error");
+    const download = new Download({
+      topic: url,
+      status: "error",
+      owner,
+    });
 
-    // remove the processed request from the queue
+    await download.save();
+
+    activeDownloads[0].status = "error";
+
+    socketClient.emit("downloadStatus", {
+      type: "ERROR",
+      status: "Download Failed",
+      activeDownloads,
+    });
+
     scrapeQueue.shift();
+    activeDownloads.shift();
 
-    await processScrapeQueue(userId);
+    await processScrapeQueue();
   }
 };
-
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const scrape = async (url) => {
   const browser = await puppeteer.launch({
@@ -263,7 +292,7 @@ const scrape = async (url) => {
   const html = content;
 
   // Convert HTML to Markdown
-  const markdown = turndownService.turndown(html);
+  const markdown = html2md(html);
 
   return { content: markdown, topic };
 };
@@ -286,4 +315,4 @@ const sanitizeUrl = (url) => {
   return sanitizedUrl;
 };
 
-module.exports = router;
+module.exports = { router, activeDownloads };
