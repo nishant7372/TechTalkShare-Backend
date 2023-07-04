@@ -16,10 +16,6 @@ const articleSchema = mongoose.Schema(
       type: Array,
       required: true,
     },
-    votes: {
-      type: Number,
-      default: 0,
-    },
     downloaded: {
       type: Boolean,
       default: false,
