@@ -4,6 +4,8 @@ const userRouter = require("./routers/user");
 const { router: articleRouter, activeDownloads } = require("./routers/article");
 const sharingRouter = require("./routers/sharing");
 const downloadRouter = require("./routers/download");
+const messageRouter = require("./routers/message");
+const Message = require("./models/message");
 const socketio = require("socket.io");
 
 const cors = require("cors");
@@ -18,6 +20,7 @@ app.use(userRouter); // registering user router
 app.use(articleRouter); // regstering article router
 app.use(sharingRouter); // regstering sharing router
 app.use(downloadRouter); // registering download Router
+app.use(messageRouter); // registering message Router
 
 const server = app.listen(port, () => {
   console.log("Server is up on the port " + port);
@@ -30,23 +33,61 @@ const io = socketio(server, {
   },
 });
 
-const connectedClients = {};
+const connectedClients = new Map();
+const chatClients = new Map();
+const chatClientsManager = new Map();
 
 io.on("connection", (socket) => {
-  console.log("New Websocket connnection", socket.id);
+  console.log("New Websocket connnection! SocketId:", socket.id);
   const socketId = socket.id;
-  connectedClients[socketId] = socket;
+  connectedClients.set(socketId, socket);
+
   socket.emit("socketId", { socketId: socket.id });
 
-  socket.on("connected", (res) => console.log(res));
+  socket.on("connected", (res) => {
+    if (res.message === "Chat Connection Established") {
+      chatClients.set(res.userId, socket);
+      chatClientsManager.set(socketId, res.userId);
+      io.emit("online_users", Array.from(chatClients.keys()));
+    }
+    console.log(res);
+    console.log("\nOnline Clients: ", connectedClients.keys());
+    console.log("Online Chat Clients: ", chatClients.keys());
+  });
 
   socket.on("downloadStatus", (getActiveDownloads) => {
     getActiveDownloads(activeDownloads);
   });
 
+  // when a sender sends a message
+  // - Server sends it to reciever (when online)
+  // - Server save the message in database as well
+  socket.on("new_message", async (newMessage) => {
+    const { sender, content, reciever } = newMessage;
+    try {
+      const message = new Message({
+        content,
+        sender,
+        reciever,
+      });
+      await message.save();
+
+      if (chatClients.has(reciever)) {
+        chatClients.get(reciever).emit("new_message", message);
+        console.log("Message sent");
+      }
+    } catch (err) {
+      console.log(err.message);
+    }
+  });
+
   socket.on("disconnect", () => {
-    connectedClients[socketId] = undefined;
-    console.log(socketId, "Client disconnected!");
+    connectedClients.delete(socketId);
+    chatClients.delete(chatClientsManager.get(socketId));
+    io.emit("online_users", Array.from(chatClients.keys()));
+    console.log("\nClient disconnected!, SocketID:", socketId);
+    console.log("\nOnline Clients: ", connectedClients.keys());
+    console.log("Online Chat Clients: ", chatClients.keys());
   });
 
   socket.on("error", (error) => {
@@ -55,23 +96,3 @@ io.on("connection", (socket) => {
 });
 
 module.exports.connectedClients = connectedClients;
-
-// setInterval(() => {
-//   const options = {
-//     hostname: "prostore-backend.onrender.com",
-//     path: "/dummy",
-//     method: "GET",
-//   };
-
-//   const req = http.request(options, (res) => {
-//     console.log(
-//       `Heartbeat Check: Server is live. Response status: ${res.statusCode}`
-//     );
-//   });
-
-//   req.on("error", (error) => {
-//     console.error("Error sending heartbeat request:", error);
-//   });
-
-//   req.end();
-// }, 5 * 60 * 1000); // Send the dummy request every 5 min
