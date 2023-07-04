@@ -8,120 +8,109 @@ const router = new express.Router();
 
 // Article sharing point (with Auth)
 
+// article can be shared only by the owner
+// cannot share to yourself
+// cannot share of already shared with a user
+// permissions - edit
+// constraints - sharedWith user must exist, article must exist, sharedBy must be owner(no explicit field required)
+
 router.post("/articles/share", auth, async (req, res) => {
-  const { userName, articleID, writePermission, sharePermission } = req.body;
-  const sharedBy = req.user._id;
+  const { userName, articleID, editPermission } = req.body;
 
   try {
+    // Check if the article exists and belongs to the user
+    const article = await Article.findOne({
+      _id: articleID,
+      owner: req.user._id,
+    }).lean();
+    if (!article) {
+      return res.status(404).send({ message: "Article Not Found" });
+    }
+
+    // Check if the user exists
     const sharedWithUser = await User.findOne({ userName });
     if (!sharedWithUser) {
       return res.status(404).send({ message: "User not found" });
     }
 
-    // when sharing with yourself
-    if (sharedBy.toString() === sharedWithUser._id.toString()) {
+    // Check if sharing with oneself
+    if (req.user._id.equals(sharedWithUser._id)) {
       return res.status(400).send({ message: "Cannot share with yourself" });
     }
 
-    // when shared with the owner
-    const isOwner = await Article.findOne({
-      _id: articleID,
-      owner: sharedWithUser._id,
-    });
-    if (isOwner) {
-      return res.status(400).send({ message: `Cannot share with the owner` });
-    }
-
-    // when already shared to a user
-    const existingSharing = await Sharing.findOne({
+    // Check if already shared to a user
+    const alreadyShared = await Sharing.findOne({
       article: articleID,
       sharedWith: sharedWithUser._id,
     });
-    if (existingSharing) {
+    if (alreadyShared) {
       return res
         .status(400)
         .send({ message: `Article already shared with ${userName}` });
     }
 
+    // Create and save the sharing document
     const sharing = new Sharing({
       article: articleID,
       sharedWith: sharedWithUser._id,
-      sharedBy,
-      writePermission,
-      sharePermission,
+      editPermission,
     });
     await sharing.save();
-    res.status(201).send(sharing);
+    res.status(201).send();
   } catch (error) {
-    res.status(400).send(error);
+    return res.status(400).send({ message: error.message });
   }
 });
 
 // All shared articles reading endpoint (with Auth)
 router.get("/shared", auth, async (req, res) => {
   const sort = {};
+  const options = {
+    limit: parseInt(req.query.limit),
+    skip: parseInt(req.query.skip),
+  };
 
   if (req.query.sortBy) {
     const parts = req.query.sortBy.split(":");
     sort[parts[0]] = parts[1] == "desc" ? -1 : 1;
   }
 
-  const options = {
-    limit: parseInt(req.query.limit),
-    skip: parseInt(req.query.skip),
-  };
-
   try {
-    let sharing = await Sharing.find({ sharedWith: req.user._id })
+    const articleCount = await Sharing.countDocuments({
+      sharedWith: req.user._id,
+    });
+    let articles = await Sharing.find({ sharedWith: req.user._id })
       .populate({
         path: "article",
+        select: ["-content"],
         populate: {
           path: "owner",
+          select: ["name", "userName"],
         },
       })
       .populate({
-        path: "sharedBy",
+        path: "sharedWith",
+        select: ["name", "userName"],
       })
-      .sort(sort);
-
-    let articles = sharing;
-
-    if (articles) {
-      articles = sharing.map((share) => ({
-        ...share.toJSON(),
-        sharedBy: {
-          name: share.sharedBy.name,
-          userName: share.sharedBy.userName,
-        },
-        article: {
-          ...share.article.toJSON(),
-          owner: {
-            name: share.article.owner.name,
-            userName: share.article.owner.userName,
-          },
-        },
-      }));
-    }
+      .sort(sort); // sorting sharings
 
     // searching by topic name
     if (req.query.search) {
-      const searchStr = req.query.search;
       articles = articles.filter((a) =>
-        a.article.topic.toLowerCase().includes(searchStr.toLowerCase())
+        a.article.topic.toLowerCase().includes(req.query.search.toLowerCase())
       );
     }
 
     //searching by tag
     if (req.query.tag) {
-      const tag = req.query.tag;
       articles = articles.filter((a) =>
         a.article.tags.some(
-          (t) => t.label.toLowerCase() === tag.label.toLowerCase()
+          (t) => t.label.toLowerCase() === req.query.tag.label.toLowerCase()
         )
       );
     }
 
-    // sorting by updated At
+    // sorting articles by updatedAt
     if (req.query.sortBy) {
       const parts = req.query.sortBy.split(":");
       if (parts[0] === "updatedAt" && parts[1] === "asc") {
@@ -142,10 +131,12 @@ router.get("/shared", auth, async (req, res) => {
       options.limit * (options.skip + 1)
     );
 
-    res.status(200).send({ articleCount: articles.length, articles });
+    res.send({
+      articles,
+      articleCount,
+    });
   } catch (error) {
-    console.log(error);
-    res.status(400).send();
+    return res.status(400).send({ message: error.message });
   }
 });
 
@@ -158,43 +149,166 @@ router.get("/shared/:id", auth, async (req, res) => {
       sharedWith: req.user._id,
       article: id,
     });
+    if (!sharing) {
+      return res.status(404).send({ message: "404 Not Found" });
+    }
     const article = await Article.findOne({ _id: id });
     if (!article) {
-      return res.status(404).send();
+      return res.status(404).send({ message: "Article Not Found" });
     }
     res.send({ article, sharing });
   } catch (error) {
-    res.status(500).send();
+    return res.status(500).send();
   }
 });
 
 // single shared article updating endpoint (with Auth)
 
 router.patch("/shared/:id", auth, async (req, res) => {
+  const { id } = req.params;
+
+  // checking if article is shared with user and has edit Permission
+  const sharing = await Sharing.findOne({
+    sharedWith: req.user._id,
+    article: id,
+    editPermission: true,
+  });
+
+  if (!sharing) {
+    return res.status(401).send({
+      message:
+        "Unauthorized. Article not shared with you or no edit permission.",
+    });
+  }
+
+  // checking if updates are allowed
   const updates = Object.keys(req.body);
-  const allowedUpdates = ["topic", "content", "tags", "votes"];
+  const allowedUpdates = ["topic", "content", "tags"];
 
   const isValidUpdate = updates.every((update) =>
     allowedUpdates.includes(update)
   );
 
   if (!isValidUpdate) {
-    return res.status(400).send({ error: "Invalid Updates!" });
+    return res.status(400).send({ message: "Invalid Updates!" });
   }
 
   try {
     const article = await Article.findOne({
-      _id: req.params.id,
+      _id: id,
     });
 
     if (!article) {
-      return res.status(404).send();
+      return res.status(404).send({ message: "Article Not Found" });
     }
+
     updates.forEach((update) => (article[update] = req.body[update]));
     await article.save();
-    res.send(article);
+    res.status(200).send();
   } catch (error) {
-    return res.status(400).send(error);
+    return res.status(400).send({ message: error.message });
+  }
+});
+
+// sharing retrieve endpoint
+
+router.get("/sharings/:id", auth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Check if the article exists and belongs to the user
+    const article = await Article.findOne({
+      _id: id,
+      owner: req.user._id,
+    }).lean();
+
+    if (!article) {
+      return res.status(404).send({ message: "Article Not Found" });
+    }
+
+    // Retrieve all sharings of the article made by owner of article
+    const sharings = await Sharing.find({ article: id })
+      .populate({
+        path: "sharedWith",
+        select: ["name", "userName"],
+      })
+      .lean();
+
+    res.send({ sharings });
+  } catch (error) {
+    return res
+      .status(500)
+      .send({ message: "An error occurred while fetching sharings" });
+  }
+});
+
+// updating permission in sharing
+
+router.patch("/sharing/:id", auth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // checking if sharing and article exist and article is owned by user
+    const sharing = await Sharing.findOne({ _id: id });
+    if (!sharing) {
+      return res.status(404).send("404 Not Found");
+    }
+    const article = await Article.findOne({
+      _id: sharing.article,
+      owner: req.user._id,
+    });
+    if (!article) {
+      return res.status(404).send("Article Not Found");
+    }
+
+    // checking if the updates are allowed
+    const updates = Object.keys(req.body);
+    const allowedUpdates = ["editPermission", "sharePermission"];
+
+    const isValidUpdate = updates.every((update) =>
+      allowedUpdates.includes(update)
+    );
+
+    if (!isValidUpdate) {
+      return res.status(400).send({ message: "Invalid Updates!" });
+    }
+
+    updates.forEach((update) => (sharing[update] = req.body[update]));
+    await sharing.save();
+
+    res.status(200).send();
+  } catch (error) {
+    return res.status(400).send({ message: error.message });
+  }
+});
+
+// single sharing delete endpoint
+
+router.delete("/sharing/:id", auth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const sharing = await Sharing.findOne({ _id: id });
+    if (!sharing) {
+      res.status(404).send({ message: "404 Not Found" });
+    }
+    const article = await Article.findOne({
+      _id: sharing.article,
+      owner: req.user._id,
+    });
+
+    if (!article) {
+      res
+        .status(401)
+        .send({ message: "UnAuthorized: Article not shared with you." });
+    }
+
+    await Sharing.findOneAndDelete({
+      _id: id,
+    });
+
+    res.status(200).send();
+  } catch (error) {
+    res.status(500).send({ message: error.message });
   }
 });
 
