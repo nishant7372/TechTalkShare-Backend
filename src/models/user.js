@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Article = require("./article");
 const Sharing = require("./sharing");
+const Download = require("./download");
 
 const userSchema = new mongoose.Schema(
   {
@@ -142,6 +143,7 @@ userSchema.pre("remove", async function (next) {
     await Sharing.deleteMany({ article: article._id });
   }
   await Article.deleteMany({ owner: user._id });
+  await Download.deleteMany({ owner: user._id });
   next();
 });
 
