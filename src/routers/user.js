@@ -93,7 +93,7 @@ router.delete("/users/me/avatar", auth, async (req, res) => {
     await req.user.save();
     res.send();
   } catch (e) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -102,12 +102,12 @@ router.get("/users/:id/avatar", async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user || !user.avatar) {
-      throw new Error();
+      res.status(404).send({ message: "User/Avatar Not Found" });
     }
     res.set("Content-Type", "image/png"); // by default application/json
     res.send(user.avatar);
   } catch (e) {
-    res.status(404).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -123,7 +123,7 @@ router.post("/users/logout", auth, async (req, res) => {
     await req.user.save();
     res.send();
   } catch (e) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -138,7 +138,7 @@ router.post("/users/logout/:id", auth, async (req, res) => {
     await req.user.save();
     res.send();
   } catch (e) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -152,7 +152,7 @@ router.post("/users/logoutAllOther", auth, async (req, res) => {
     await req.user.save();
     res.send();
   } catch (e) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -168,7 +168,7 @@ router.get("/users/me", auth, async (req, res) => {
     res.send({ user: req.user, currentSessionId: session.id });
   } catch (error) {
     // internal server error / server down
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -182,13 +182,12 @@ router.patch("/users/me", auth, async (req, res) => {
   );
 
   if (!isValidOperation) {
-    // 400 -> bad request (invalid request)
     return res.status(400).send({ message: "Invalid Updates!" });
   }
   try {
     updates.forEach((update) => (req.user[update] = req.body[update]));
     await req.user.save();
-    res.send(req.user);
+    res.status(200).send();
   } catch (error) {
     // 400 -> bad request (invalid request)
     return res.status(400).send({ message: error.message });
@@ -203,7 +202,7 @@ router.delete("/users/me", auth, async (req, res) => {
     res.send(req.user);
   } catch (error) {
     // internal server error / server down
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -214,7 +213,22 @@ router.get("/users", auth, async (req, res) => {
     const users = await User.find({}, "name userName avatar");
     res.send(users);
   } catch (error) {
-    res.status(404).send();
+    res.status(500).send({ message: error.message });
+  }
+});
+
+// single user fetch endpoint
+
+router.get("/user/:userName", auth, async (req, res) => {
+  const { userName } = req.params;
+  try {
+    const user = await User.findOne({ userName }, "name userName avatar");
+    if (!user) {
+      return res.status(404).send({ message: "No User Found" });
+    }
+    res.send(user);
+  } catch (error) {
+    return res.status(500).send({ message: error.message });
   }
 });
 
