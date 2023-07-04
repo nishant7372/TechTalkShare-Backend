@@ -11,7 +11,7 @@ router.get("/downloads", auth, async (req, res) => {
     });
     res.send(downloads);
   } catch (error) {
-    res.status(400).send();
+    res.status(400).send({ message: error.message });
   }
 });
 
@@ -23,11 +23,11 @@ router.delete("/downloads/:id", auth, async (req, res) => {
     });
 
     if (!download) {
-      return res.status(404).send();
+      return res.status(404).send({ message: "Download Record Not Found" });
     }
     res.send(download);
   } catch (error) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 

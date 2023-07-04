@@ -13,16 +13,16 @@ const obj = require("./../index");
 
 // article creation endpoint (with Auth)
 
-router.post("/articles", auth, async (req, res) => {
+router.post("/article", auth, async (req, res) => {
   const article = new Article({
     ...req.body,
     owner: req.user._id,
   });
   try {
     await article.save();
-    res.status(201).send(article);
+    res.status(201).send();
   } catch (error) {
-    res.status(400).send(error);
+    res.status(400).send({ message: error.message });
   }
 });
 
@@ -63,34 +63,39 @@ router.get("/articles", auth, async (req, res) => {
         skip: parseInt(req.query.skip),
         sort,
       },
+      select: "-content",
     });
+
     res.send({
       articles: req.user.articles,
       articleCount,
     });
   } catch (error) {
-    res.status(400).send();
+    res.status(400).send({ message: error.message });
   }
 });
 
 // single article reading endpoint (with Auth)
 
-router.get("/articles/:id", auth, async (req, res) => {
+router.get("/article/:id", auth, async (req, res) => {
   const { id } = req.params;
   try {
-    const article = await Article.findOne({ _id: id, owner: req.user._id });
+    const article = await Article.findOne({
+      _id: id,
+      owner: req.user._id,
+    }).lean();
     if (!article) {
-      return res.status(404).send();
+      return res.status(404).send({ message: "Article Not Found" });
     }
     res.send(article);
   } catch (error) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
 // single article updating endpoint (with Auth)
 
-router.patch("/articles/:id", auth, async (req, res) => {
+router.patch("/article/:id", auth, async (req, res) => {
   const updates = Object.keys(req.body);
   const allowedUpdates = ["topic", "content", "tags", "votes"];
 
@@ -99,7 +104,7 @@ router.patch("/articles/:id", auth, async (req, res) => {
   );
 
   if (!isValidUpdate) {
-    return res.status(400).send({ error: "Invalid Updates!" });
+    return res.status(400).send({ message: "Invalid Updates!" });
   }
 
   try {
@@ -109,19 +114,19 @@ router.patch("/articles/:id", auth, async (req, res) => {
     });
 
     if (!article) {
-      return res.status(404).send();
+      return res.status(404).send({ message: "Article Not Found" });
     }
     updates.forEach((update) => (article[update] = req.body[update]));
     await article.save();
-    res.send(article);
+    res.status(200).send();
   } catch (error) {
-    return res.status(400).send(error);
+    return res.status(400).send({ message: error.message });
   }
 });
 
 // single article deleting endpoint (with Auth)
 
-router.delete("/articles/:id", auth, async (req, res) => {
+router.delete("/article/:id", auth, async (req, res) => {
   try {
     await Sharing.deleteMany({
       article: req.params.id,
@@ -129,14 +134,14 @@ router.delete("/articles/:id", auth, async (req, res) => {
     const article = await Article.findOneAndDelete({
       _id: req.params.id,
       owner: req.user._id,
-    });
+    }).lean();
 
     if (!article) {
-      return res.status(404).send();
+      return res.status(404).send({ message: "Article Not Found" });
     }
-    res.send(article);
+    res.status(200).send();
   } catch (error) {
-    res.status(500).send();
+    res.status(500).send({ message: error.message });
   }
 });
 
@@ -150,10 +155,10 @@ router.get("/scrape", auth, async (req, res) => {
   try {
     const url = sanitizeUrl(req.query.url);
     if (!isValidUrl(url)) {
-      return res.status(400).send("Invalid URL");
+      return res.status(400).send({ message: "Invalid URL!" });
     }
     const socketId = req.query.socketId;
-    const socketClient = obj.connectedClients[socketId];
+    const socketClient = obj.connectedClients.get(socketId);
 
     activeDownloads.push({
       updatedAt: new Date().toISOString(),
@@ -176,7 +181,7 @@ router.get("/scrape", auth, async (req, res) => {
     }
     res.status(200).send({ status: "No active downloads" });
   } catch (error) {
-    res.status(500).send("Unable to download");
+    res.status(500).send({ message: error.message });
   }
 });
 
