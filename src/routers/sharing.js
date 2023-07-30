@@ -76,9 +76,6 @@ router.get("/shared", auth, async (req, res) => {
   }
 
   try {
-    const articleCount = await Sharing.countDocuments({
-      sharedWith: req.user._id,
-    });
     let articles = await Sharing.find({ sharedWith: req.user._id })
       .populate({
         path: "article",
@@ -126,14 +123,9 @@ router.get("/shared", auth, async (req, res) => {
       }
     }
 
-    articles = articles.slice(
-      options.limit * options.skip,
-      options.limit * (options.skip + 1)
-    );
-
     res.send({
-      articles,
-      articleCount,
+      articles: articles.slice(options.skip, options.limit + options.skip),
+      articleCount: articles.length,
     });
   } catch (error) {
     return res.status(400).send({ message: error.message });
