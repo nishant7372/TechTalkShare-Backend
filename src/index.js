@@ -13,7 +13,12 @@ const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+const corsOptions = {
+  origin: ["http://localhost:3001", "https://d3vstore.netlify.app"],
+  methods: "*",
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json()); // parse incoming json to object for accessing it in request handlers
 app.use(userRouter); // registering user router
@@ -26,12 +31,7 @@ const server = app.listen(port, () => {
   console.log("Server is up on the port " + port);
 });
 
-const io = socketio(server, {
-  cors: {
-    origin: ["http://localhost:3001", "https://d3vstore.netlify.app"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  },
-});
+const io = socketio(server, { cors: corsOptions });
 
 const connectedClients = new Map();
 const chatClients = new Map();
