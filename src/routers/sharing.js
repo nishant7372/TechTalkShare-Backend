@@ -10,12 +10,14 @@ const router = new express.Router();
 
 // article can be shared only by the owner
 // cannot share to yourself
-// cannot share of already shared with a user
+// cannot share if already shared with a user
 // permissions - edit
+// message - edit
 // constraints - sharedWith user must exist, article must exist, sharedBy must be owner(no explicit field required)
 
 router.post("/articles/share", auth, async (req, res) => {
-  const { userName, articleID, editPermission } = req.body;
+  const { users, articleID } = req.body;
+  let sharingErrors = "";
 
   try {
     // Check if the article exists and belongs to the user
@@ -27,40 +29,56 @@ router.post("/articles/share", auth, async (req, res) => {
       return res.status(404).send({ message: "Article Not Found" });
     }
 
-    // Check if the user exists
-    const sharedWithUser = await User.findOne({ userName });
-    if (!sharedWithUser) {
-      return res.status(404).send({ message: "User not found" });
+    for (const user of users) {
+      try {
+        await share(user, req);
+      } catch (error) {
+        sharingErrors += `${error.message}<br>`;
+      }
     }
 
-    // Check if sharing with oneself
-    if (req.user._id.equals(sharedWithUser._id)) {
-      return res.status(400).send({ message: "Cannot share with yourself" });
+    if (sharingErrors.length > 0) {
+      return res.status(400).send({ message: sharingErrors });
     }
 
-    // Check if already shared to a user
-    const alreadyShared = await Sharing.findOne({
-      article: articleID,
-      sharedWith: sharedWithUser._id,
-    });
-    if (alreadyShared) {
-      return res
-        .status(400)
-        .send({ message: `Article already shared with ${userName}` });
-    }
-
-    // Create and save the sharing document
-    const sharing = new Sharing({
-      article: articleID,
-      sharedWith: sharedWithUser._id,
-      editPermission,
-    });
-    await sharing.save();
-    res.status(201).send();
+    res.status(200).send({ message: "Articles shared successfully" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
 });
+
+const share = async (userId, req) => {
+  const { articleID, editPermission, message } = req.body;
+
+  // Check if the user exists
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error(`User not found for ID: ${userId}`);
+  }
+
+  // Check if sharing with oneself
+  if (req.user._id.equals(user._id)) {
+    throw new Error("Cannot share with yourself");
+  }
+
+  // Check if already shared to a user
+  const alreadyShared = await Sharing.findOne({
+    article: articleID,
+    sharedWith: user._id,
+  });
+  if (alreadyShared) {
+    throw new Error(`Article already shared with ${user.userName}`);
+  }
+
+  // Create and save the sharing document
+  const sharing = new Sharing({
+    article: articleID,
+    sharedWith: user._id,
+    editPermission,
+    message,
+  });
+  await sharing.save();
+};
 
 // All shared articles reading endpoint (with Auth)
 router.get("/shared", auth, async (req, res) => {
