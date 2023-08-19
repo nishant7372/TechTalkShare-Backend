@@ -95,17 +95,14 @@ router.get("/shared", auth, async (req, res) => {
 
   try {
     let articles = await Sharing.find({ sharedWith: req.user._id })
+      .select("editPermission createdAt message")
       .populate({
         path: "article",
-        select: ["-content"],
+        select: ["-content", "-createdAt"],
         populate: {
           path: "owner",
           select: ["name", "userName"],
         },
-      })
-      .populate({
-        path: "sharedWith",
-        select: ["name", "userName"],
       })
       .sort(sort); // sorting sharings
 
@@ -141,9 +138,28 @@ router.get("/shared", auth, async (req, res) => {
       }
     }
 
+    const articleCount = articles.length;
+
+    articles = articles.slice(options.skip, options.limit + options.skip);
+    articles = articles.map((articleObj) => {
+      const { editPermission, article, message, createdAt } = articleObj;
+      const { topic, tags, downloaded, owner, updatedAt, _id } = article;
+      return {
+        topic,
+        tags,
+        downloaded,
+        owner,
+        updatedAt,
+        _id,
+        editPermission,
+        message,
+        createdAt,
+      };
+    });
+
     res.send({
-      articles: articles.slice(options.skip, options.limit + options.skip),
-      articleCount: articles.length,
+      articles: articles,
+      articleCount,
     });
   } catch (error) {
     return res.status(400).send({ message: error.message });
