@@ -1,8 +1,6 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const User = require("../models/user");
-const multer = require("multer");
-const sharp = require("sharp");
 
 const router = new express.Router();
 
@@ -48,66 +46,6 @@ router.post("/users/login", async (req, res) => {
   } catch (error) {
     // 400 -> bad request (invalid request)
     res.status(400).send({ message: error.message });
-  }
-});
-
-// Avatar Upload, Delete and Fetch Endpoint  -----------------------------
-
-// validating avatar upload using multer
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 1000000, // 1MB
-  },
-  fileFilter(req, file, cb) {
-    if (!file.originalname.match(/\.(jpg|png|jpeg)$/)) {
-      return cb(new Error("Please upload an image"));
-    }
-    cb(undefined, true);
-  },
-});
-
-// avatar upload endpoint (with Auth)
-router.post(
-  "/users/me/avatar",
-  auth,
-  upload.single("avatar"),
-  async (req, res) => {
-    const buffer = await sharp(req.file.buffer)
-      .resize({ width: 250, height: 250 })
-      .png()
-      .toBuffer();
-    req.user.avatar = buffer;
-    await req.user.save();
-    res.send();
-  },
-  (error, req, res, next) => {
-    res.status(400).send({ message: error.message });
-  }
-);
-
-// avatar delete endpoint (with Auth)
-router.delete("/users/me/avatar", auth, async (req, res) => {
-  try {
-    req.user.avatar = undefined;
-    await req.user.save();
-    res.send();
-  } catch (e) {
-    res.status(500).send({ message: error.message });
-  }
-});
-
-// avatar fetching endpoint by user id
-router.get("/users/:id/avatar", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user || !user.avatar) {
-      res.status(404).send({ message: "User/Avatar Not Found" });
-    }
-    res.set("Content-Type", "image/png"); // by default application/json
-    res.send(user.avatar);
-  } catch (e) {
-    res.status(500).send({ message: error.message });
   }
 });
 
@@ -190,7 +128,7 @@ router.patch("/users/me", auth, async (req, res) => {
     res
       .status(200)
       .send(
-        updates[0] === "password"
+        updates?.[0] === "password"
           ? { ok: "Password updated Successfully" }
           : { ok: "User Updated Successfully" }
       );

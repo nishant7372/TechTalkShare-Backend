@@ -5,6 +5,7 @@ const { router: articleRouter, activeDownloads } = require("./routers/article");
 const sharingRouter = require("./routers/sharing");
 const downloadRouter = require("./routers/download");
 const messageRouter = require("./routers/message");
+const avatarRouter = require("./routers/avatar");
 const Message = require("./models/message");
 const storeRouter = require("./routers/store");
 const socketio = require("socket.io");
@@ -28,6 +29,7 @@ app.use(sharingRouter); // regstering sharing router
 app.use(downloadRouter); // registering download Router
 app.use(messageRouter); // registering message Router
 app.use(storeRouter); // registering store Router
+app.use(avatarRouter); //registering avatar Router
 
 const server = app.listen(port, () => {
   console.log("Server is up on the port " + port);
