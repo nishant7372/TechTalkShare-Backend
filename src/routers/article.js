@@ -8,6 +8,7 @@ const chromium = require("chromium");
 const router = new express.Router();
 const validUrl = require("valid-url");
 const html2md = require("html-to-md");
+const RecentItem = require("../models/recentItem");
 
 const obj = require("./../index");
 
@@ -87,17 +88,34 @@ router.get("/article/:id", auth, async (req, res) => {
     if (!article) {
       return res.status(404).send({ message: "Article Not Found" });
     }
+    await createRecentItem(req);
     res.send(article);
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
 });
 
+const createRecentItem = async (req) => {
+  const { id } = req.params;
+  const existingRecentItem = await RecentItem.findOne({ article: id });
+  if (existingRecentItem) {
+    existingRecentItem.updatedAt = new Date().toISOString();
+    await existingRecentItem.save();
+  } else {
+    const recent = new RecentItem({
+      article: id,
+      isShared: false,
+      owner: req.user._id,
+    });
+    await recent.save();
+  }
+};
+
 // single article updating endpoint (with Auth)
 
 router.patch("/article/:id", auth, async (req, res) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = ["topic", "content", "tags", "votes"];
+  const allowedUpdates = ["topic", "content", "tags"];
 
   const isValidUpdate = updates.every((update) =>
     allowedUpdates.includes(update)
@@ -144,6 +162,8 @@ router.delete("/article/:id", auth, async (req, res) => {
     res.status(500).send({ message: error.message });
   }
 });
+
+// article scraping/downloading endpoint
 
 const scrapeQueue = [];
 const activeDownloads = [];
@@ -258,6 +278,8 @@ const processScrapeQueue = async () => {
     await processScrapeQueue();
   }
 };
+
+// scrape function 
 
 const scrape = async (url) => {
   const browser = await puppeteer.launch({
