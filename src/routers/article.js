@@ -67,9 +67,10 @@ router.get("/articles", auth, async (req, res) => {
       select: "-content",
     });
 
-    res.send({
+    res.status(200).send({
       articles: req.user.articles,
       articleCount,
+      ok: true,
     });
   } catch (error) {
     res.status(400).send({ message: error.message });

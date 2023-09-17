@@ -41,7 +41,7 @@ router.post("/articles/share", auth, async (req, res) => {
       return res.status(400).send({ message: sharingErrors });
     }
 
-    res.status(200).send({ message: "Articles shared successfully" });
+    res.status(200).send({ ok: "Article shared successfully" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -157,9 +157,10 @@ router.get("/shared", auth, async (req, res) => {
       };
     });
 
-    res.send({
+    res.status(200).send({
       articles: articles,
       articleCount,
+      ok: true,
     });
   } catch (error) {
     return res.status(400).send({ message: error.message });
@@ -182,7 +183,7 @@ router.get("/shared/:id", auth, async (req, res) => {
     if (!article) {
       return res.status(404).send({ message: "Article Not Found" });
     }
-    res.send({ article, sharing });
+    res.status(200).send({ article, sharing, ok: true });
   } catch (error) {
     return res.status(500).send();
   }
@@ -230,7 +231,7 @@ router.patch("/shared/:id", auth, async (req, res) => {
 
     updates.forEach((update) => (article[update] = req.body[update]));
     await article.save();
-    res.status(200).send();
+    res.status(200).send({ ok: "Article Successfully Updated" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -260,7 +261,7 @@ router.get("/sharings/:id", auth, async (req, res) => {
       })
       .lean();
 
-    res.send({ sharings });
+    res.status(200).send({ sharings, ok: true });
   } catch (error) {
     return res
       .status(500)
@@ -302,7 +303,7 @@ router.patch("/sharing/:id", auth, async (req, res) => {
     updates.forEach((update) => (sharing[update] = req.body[update]));
     await sharing.save();
 
-    res.status(200).send();
+    res.status(200).send({ ok: "Permissions updated Successfully" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -332,7 +333,7 @@ router.delete("/sharing/:id", auth, async (req, res) => {
       _id: id,
     });
 
-    res.status(200).send();
+    res.status(200).send({ ok: "Sharing Record Deleted" });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
