@@ -21,7 +21,7 @@ router.post("/article", auth, async (req, res) => {
   });
   try {
     await article.save();
-    res.status(201).send();
+    res.status(201).send({ ok: "Article Created" });
   } catch (error) {
     res.status(400).send({ message: error.message });
   }
@@ -89,7 +89,7 @@ router.get("/article/:id", auth, async (req, res) => {
       return res.status(404).send({ message: "Article Not Found" });
     }
     await createRecentItem(req);
-    res.send(article);
+    res.status(200).send({ article: article, ok: true });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
@@ -136,7 +136,7 @@ router.patch("/article/:id", auth, async (req, res) => {
     }
     updates.forEach((update) => (article[update] = req.body[update]));
     await article.save();
-    res.status(200).send();
+    res.status(200).send({ ok: "Article Successfully Updated" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -157,7 +157,7 @@ router.delete("/article/:id", auth, async (req, res) => {
     if (!article) {
       return res.status(404).send({ message: "Article Not Found" });
     }
-    res.status(200).send();
+    res.status(200).send({ ok: "Article Successfully Deleted" });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
@@ -279,7 +279,7 @@ const processScrapeQueue = async () => {
   }
 };
 
-// scrape function 
+// scrape function
 
 const scrape = async (url) => {
   const browser = await puppeteer.launch({
