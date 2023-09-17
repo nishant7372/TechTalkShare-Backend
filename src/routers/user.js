@@ -25,7 +25,7 @@ router.post("/users", async (req, res) => {
     );
     await user.save();
     // 201 -> created
-    res.status(201).send({ user, token });
+    res.status(201).send({ user, token, ok: "Signup Successful" });
   } catch (error) {
     // 400 -> bad request (invalid data)
     res.status(400).send({ message: error.message });
@@ -44,7 +44,7 @@ router.post("/users/login", async (req, res) => {
       browser,
       model
     );
-    res.send({ user, token });
+    res.status(200).send({ user, token, ok: "Login Successful" });
   } catch (error) {
     // 400 -> bad request (invalid request)
     res.status(400).send({ message: error.message });
@@ -121,7 +121,7 @@ router.post("/users/logout", auth, async (req, res) => {
       (session) => session.token != req.token
     );
     await req.user.save();
-    res.send();
+    res.status(200).send({ ok: "Logout Successful" });
   } catch (e) {
     res.status(500).send({ message: error.message });
   }
@@ -136,7 +136,7 @@ router.post("/users/logout/:id", auth, async (req, res) => {
       (session) => session._id.toString() != id
     );
     await req.user.save();
-    res.send();
+    res.status(200).send({ ok: "Logout Successful" });
   } catch (e) {
     res.status(500).send({ message: error.message });
   }
@@ -150,7 +150,7 @@ router.post("/users/logoutAllOther", auth, async (req, res) => {
       (session) => session.token == req.token
     );
     await req.user.save();
-    res.send();
+    res.status(200).send({ ok: "Logout Successful" });
   } catch (e) {
     res.status(500).send({ message: error.message });
   }
@@ -165,7 +165,7 @@ router.get("/users/me", auth, async (req, res) => {
     const session = req.user.sessions.find(
       (session) => session.token == req.token
     );
-    res.send({ user: req.user, currentSessionId: session.id });
+    res.send({ user: req?.user, currentSessionId: session?.id, ok: true });
   } catch (error) {
     // internal server error / server down
     res.status(500).send({ message: error.message });
@@ -175,7 +175,7 @@ router.get("/users/me", auth, async (req, res) => {
 // single user updating endpoint (Update user)
 
 router.patch("/users/me", auth, async (req, res) => {
-  const updates = Object.keys(req.body);
+  const updates = Object.keys(req?.body);
   const allowedUpdates = ["name", "userName", "password", "age"];
   const isValidOperation = updates.every((update) =>
     allowedUpdates.includes(update)
@@ -187,7 +187,13 @@ router.patch("/users/me", auth, async (req, res) => {
   try {
     updates.forEach((update) => (req.user[update] = req.body[update]));
     await req.user.save();
-    res.status(200).send();
+    res
+      .status(200)
+      .send(
+        updates[0] === "password"
+          ? { ok: "Password updated Successfully" }
+          : { ok: "User Updated Successfully" }
+      );
   } catch (error) {
     // 400 -> bad request (invalid request)
     return res.status(400).send({ message: error.message });
@@ -199,7 +205,7 @@ router.patch("/users/me", auth, async (req, res) => {
 router.delete("/users/me", auth, async (req, res) => {
   try {
     await req.user.remove();
-    res.send(req.user);
+    res.status(200).send({ ok: "User Account Deleted Successfully" });
   } catch (error) {
     // internal server error / server down
     res.status(500).send({ message: error.message });
@@ -211,7 +217,7 @@ router.delete("/users/me", auth, async (req, res) => {
 router.get("/users", auth, async (req, res) => {
   try {
     const users = await User.find({}, "name userName avatar");
-    res.send(users);
+    res.status(200).send({ ok: true, users });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
@@ -226,7 +232,7 @@ router.get("/user/:userName", auth, async (req, res) => {
     if (!user) {
       return res.status(404).send({ message: "No User Found" });
     }
-    res.send(user);
+    res.status(200).send({ ok: true, user });
   } catch (error) {
     return res.status(500).send({ message: error.message });
   }
