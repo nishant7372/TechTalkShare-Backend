@@ -27,7 +27,7 @@ router.get("/messages/:userName", auth, async (req, res) => {
       (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
     );
 
-    res.send(allMessages);
+    res.send({ ok: true, messages: allMessages });
   } catch (error) {
     return res.status(500).send({ message: error.message });
   }
