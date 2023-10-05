@@ -37,7 +37,7 @@ router.post("/articles/share", auth, async (req, res) => {
       }
     }
 
-    if (sharingErrors.length > 0) {
+    if (sharingErrors?.length > 0) {
       return res.status(400).send({ message: sharingErrors });
     }
 
@@ -84,11 +84,11 @@ const share = async (userId, req) => {
 router.get("/shared", auth, async (req, res) => {
   const sort = {};
   const options = {
-    limit: parseInt(req.query.limit),
-    skip: parseInt(req.query.skip),
+    limit: parseInt(req?.query?.limit),
+    skip: parseInt(req?.query?.skip),
   };
 
-  if (req.query.sortBy) {
+  if (req?.query?.sortBy) {
     const parts = req.query.sortBy.split(":");
     sort[parts[0]] = parts[1] == "desc" ? -1 : 1;
   }
@@ -140,7 +140,9 @@ router.get("/shared", auth, async (req, res) => {
 
     const articleCount = articles.length;
 
-    articles = articles.slice(options.skip, options.limit + options.skip);
+    if (options?.skip && options?.limit) {
+      articles = articles.slice(options?.skip, options?.limit + options?.skip);
+    }
     articles = articles.map((articleObj) => {
       const { editPermission, article, message, createdAt } = articleObj;
       const { topic, tags, downloaded, owner, updatedAt, _id } = article;

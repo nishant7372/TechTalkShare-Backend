@@ -20,6 +20,14 @@ const articleSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    isStarred: {
+      type: Boolean,
+      default: false,
+    },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,

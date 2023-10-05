@@ -33,24 +33,25 @@ router.get("/messages/:userName", auth, async (req, res) => {
   }
 });
 
-// router.post("/message", auth, async (req, res) => {
-//   const { content, userName } = req.body;
-//   try {
-//     const reciever = await User.findOne({ userName });
-//     if (!reciever) {
-//       return res.status(404).send({ message: "User Not Found" });
-//     }
-//     const message = new Message({
-//       content,
-//       sender: req.user._id,
-//       reciever: reciever._id,
-//     });
-//     await message.save();
-//     res.status(201).send();
-//   } catch (error) {
-//     return res.status(400).send({ message: error.message });
-//   }
-// });
+router.post("/message/:userName", auth, async (req, res) => {
+  const { userName } = req.params;
+  const { content } = req.body;
+  try {
+    const reciever = await User.findOne({ userName });
+    if (!reciever) {
+      return res.status(404).send({ message: "User Not Found" });
+    }
+    const message = new Message({
+      content,
+      sender: req.user._id,
+      reciever: reciever._id,
+    });
+    await message.save();
+    res.status(201).send({ ok: "Message Sent" });
+  } catch (error) {
+    return res.status(400).send({ message: error.message });
+  }
+});
 
 router.patch("/message/:id", auth, async (req, res) => {
   const { id } = req.params;
@@ -72,7 +73,24 @@ router.patch("/message/:id", auth, async (req, res) => {
     }
     updates.forEach((update) => (message[update] = req.body[update]));
     await message.save();
-    res.status(200).send();
+    res.status(200).send({ ok: "Message Updated Successfully" });
+  } catch (error) {
+    return res.status(400).send({ message: error.message });
+  }
+});
+
+router.delete("/message/:id", auth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // checking if the updates are allowed
+    const message = await Message.findOneAndDelete({
+      _id: id,
+      sender: req.user._id,
+    }).lean();
+    if (!message) {
+      return res.status(404).send({ message: "Message Not Found" });
+    }
+    res.status(200).send({ ok: "Message Deleted Successfully" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }

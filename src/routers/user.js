@@ -168,7 +168,7 @@ router.get("/user/:userName", auth, async (req, res) => {
   try {
     const user = await User.findOne({ userName }, "name userName avatar");
     if (!user) {
-      return res.status(404).send({ message: "No User Found" });
+      return res.status(404).send({ message: "User not Found" });
     }
     res.status(200).send({ ok: true, user });
   } catch (error) {

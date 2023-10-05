@@ -13,6 +13,7 @@ const router = new express.Router();
 router.get("/recent", auth, async (req, res) => {
   const limit = parseInt(req?.query?.limit) || null;
   try {
+    let count = await RecentItem.countDocuments({});
     let recents = await RecentItem.find({ owner: req?.user?._id })
       .select("-owner")
       .populate({
@@ -20,8 +21,12 @@ router.get("/recent", auth, async (req, res) => {
         select: "topic",
       })
       .sort({ updatedAt: "desc" })
-      .limit(limit);
-    res.send({ count: recents?.length, recents: recents });
+      .limit(limit)
+      .lean();
+    recents = recents.map(({ article, ...item }) => {
+      return { ...item, ...article };
+    });
+    res.send({ count, recents, ok: true });
   } catch (err) {
     res.status(500).send({ message: err?.message });
   }
@@ -29,35 +34,17 @@ router.get("/recent", auth, async (req, res) => {
 
 // add to pin
 router.post("/pin", auth, async (req, res) => {
-  const { id, isShared } = req?.body;
+  const { id } = req?.body;
   try {
-    const isArticlePresent = await Article.findOne({
+    const article = await Article.findOne({
       _id: id,
       owner: req.user._id,
     });
-    // if article does not exists or belongs to a different user.
-    console.log("isArticlePresent>>>>>>>>>>>>>>>>>", isArticlePresent);
-    if (!isArticlePresent) {
-      return res.status(404).send({ message: "Item not found" });
+    if (!article) {
+      return res.status(404).send({ message: "Article Not Found" });
     }
-    const isAlreadyPinned = await PinnedItem.findOne({
-      article: id,
-      owner: req?.user?._id,
-    });
-    console.log("isAlreadyPinned>>>>>>>>>>>>>>>>>", isAlreadyPinned);
-    // if article is already pinned
-    if (isAlreadyPinned) {
-      return res.status(200).send({
-        ok: "Item is already pinned!",
-      });
-    }
-    // creating a new pin for the current article
-    const pinned = new PinnedItem({
-      article: id,
-      isShared,
-      owner: req.user._id,
-    });
-    await pinned.save();
+    article["isPinned"] = true;
+    await article.save();
     res.status(201).send({ ok: "Added!" });
   } catch (err) {
     res.status(400).send({ message: err.message });
@@ -66,18 +53,20 @@ router.post("/pin", auth, async (req, res) => {
 
 // unpin
 router.delete("/pin/:id", auth, async (req, res) => {
-  const { id } = req.params;
+  const { id } = req?.params;
   try {
-    const pinned = await PinnedItem.findOneAndDelete({
-      article: id,
+    const article = await Article.findOne({
+      _id: id,
       owner: req.user._id,
-    }).lean();
-    if (!pinned) {
-      return res.status(404).send({ message: "Item Not Found" });
+    });
+    if (!article) {
+      return res.status(404).send({ message: "Article Not Found" });
     }
-    res.status(200).send({ ok: "Item unpinned" });
+    article["isPinned"] = false;
+    await article.save();
+    res.status(200).send({ ok: "Article Unpinned" });
   } catch (err) {
-    res.status(500).send({ message: err.message });
+    res.status(400).send({ message: err.message });
   }
 });
 
@@ -85,16 +74,17 @@ router.delete("/pin/:id", auth, async (req, res) => {
 router.get("/pinned", auth, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || null;
-    let pinned = await PinnedItem.find({ owner: req.user._id })
-      .select("-owner")
-      .populate({
-        path: "article",
-        select: "topic",
-      })
+    let count = await Article.countDocuments({
+      owner: req.user._id,
+      isPinned: true,
+    });
+    let pinned = await Article.find({ owner: req.user._id, isPinned: true })
+      .select("-content -owner")
       .sort({ updatedAt: "desc" })
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
-    res.send({ count: pinned.length, pinned: pinned });
+    res.send({ count, pinned, ok: true });
   } catch (err) {
     res.status(500).send({ message: err.message });
   }
@@ -102,55 +92,39 @@ router.get("/pinned", auth, async (req, res) => {
 
 // add to starred
 router.post("/star", auth, async (req, res) => {
-  const { id, isShared } = req.body;
+  const { id } = req?.body;
   try {
-    const isArticlePresent = await Article.findOne({
+    const article = await Article.findOne({
       _id: id,
       owner: req.user._id,
     });
-    // if article does not exists or belongs to a different user.
-    console.log("isArticlePresent>>>>>>>>>>>>>>>>>", isArticlePresent);
-    if (!isArticlePresent) {
-      return res.status(404).send({ message: "Item not found" });
+    if (!article) {
+      return res.status(404).send({ message: "Article Not Found" });
     }
-    const isAlreadyStarred = await StarredItem.findOne({
-      article: id,
-      owner: req.user._id,
-    });
-    console.log("isAlreadyStarred>>>>>>>>>>>>>>>>>", isAlreadyStarred);
-    // if article is already starred
-    if (isAlreadyStarred) {
-      return res.status(200).send({
-        ok: "Item is already starred!",
-      });
-    }
-    // starring current article
-    const starred = new StarredItem({
-      article: id,
-      isShared,
-      owner: req.user._id,
-    });
-    await starred.save();
+    article["isStarred"] = true;
+    await article.save();
     res.status(201).send({ ok: "Starred!" });
   } catch (err) {
     res.status(400).send({ message: err.message });
   }
 });
 
-// remove star
+// remove from starred
 router.delete("/star/:id", auth, async (req, res) => {
-  const { id } = req.params;
+  const { id } = req?.params;
   try {
-    const starred = await StarredItem.findOneAndDelete({
-      article: id,
+    const article = await Article.findOne({
+      _id: id,
       owner: req.user._id,
-    }).lean();
-    if (!starred) {
-      return res.status(404).send({ message: "Item Not Found" });
+    });
+    if (!article) {
+      return res.status(404).send({ message: "Article Not Found" });
     }
-    res.status(200).send({ ok: "Remove from starred" });
+    article["isStarred"] = false;
+    await article.save();
+    res.status(200).send({ ok: "Remove from Starred!" });
   } catch (err) {
-    res.status(500).send({ message: err.message });
+    res.status(400).send({ message: err.message });
   }
 });
 
@@ -158,16 +132,17 @@ router.delete("/star/:id", auth, async (req, res) => {
 router.get("/starred", auth, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || null;
-    let starred = await StarredItem.find({ owner: req.user._id })
-      .select("-owner")
-      .populate({
-        path: "article",
-        select: "topic",
-      })
+    let count = await Article.countDocuments({
+      owner: req.user._id,
+      isStarred: true,
+    });
+    let starred = await Article.find({ owner: req.user._id, isStarred: true })
+      .select("-content -owner")
       .sort({ updatedAt: "desc" })
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
-    res.send({ count: starred.length, starred: starred });
+    res.send({ count, starred, ok: true });
   } catch (err) {
     res.status(500).send({ message: err.message });
   }
@@ -184,7 +159,7 @@ router.post("/folder", auth, async (req, res) => {
     await folder.save();
     res.send({ ok: "Folder Created" });
   } catch (err) {
-    res.status(500).send({ message: err.message });
+    res.status(400).send({ message: err.message });
   }
 });
 
@@ -195,18 +170,18 @@ router.get("/folder/:id", auth, async (req, res) => {
     const folder = await Folder.findOne({
       owner: req.user._id,
       _id: id,
-    }).populate({ path: "files" });
-    console.log(folder);
+    }).populate({ path: "files", select: "-content -votes" });
+
     if (!folder) {
       return res.status(404).send({ message: "Folder not found" });
     }
-    res.send({ folder });
+    res.status(200).send({ folder, ok: true });
   } catch (err) {
     res.status(500).send({ message: err.message });
   }
 });
 
-// delete a new folder
+// delete a folder
 router.delete("/folder/:id", auth, async (req, res) => {
   const { id } = req.params;
   try {
@@ -219,7 +194,7 @@ router.delete("/folder/:id", auth, async (req, res) => {
     }
     res.send({ ok: "Folder deleted successfully" });
   } catch (err) {
-    res.status(500).send({ message: err.message });
+    res.status(400).send({ message: err.message });
   }
 });
 
@@ -229,14 +204,17 @@ router.get("/folders", auth, async (req, res) => {
   try {
     let folders = await Folder.find({ owner: req.user._id })
       .limit(limit)
+      .sort({ name: 1 })
       .lean();
-    res.send({ count: folders.length, folders: folders });
+
+    res.send({ count: folders.length, folders: folders, ok: true });
   } catch (err) {
     res.status(500).send({ message: err.message });
   }
 });
 
-router.post("/addfiles", auth, async (req, res) => {
+// add files
+router.post("/folder/addfiles", auth, async (req, res) => {
   const { files, id } = req.body;
   try {
     const result = await Folder.updateOne(
@@ -248,7 +226,23 @@ router.post("/addfiles", auth, async (req, res) => {
     }
     res.send({ ok: "Files Added" });
   } catch (err) {
-    res.status(500).send({ message: err.message });
+    res.status(400).send({ message: err.message });
+  }
+});
+
+// rename a folder
+router.patch("/folder/rename", auth, async (req, res) => {
+  const { name, id } = req.body;
+  try {
+    const folder = await Folder.findOne({ _id: id, owner: req?.user?._id });
+    if (!folder) {
+      return res.status(404).send({ message: "Folder not found" });
+    }
+    folder["name"] = name;
+    await folder.save();
+    res.send({ ok: "Folder Renamed Successfully" });
+  } catch (err) {
+    res.status(400).send({ message: err.message });
   }
 });
 

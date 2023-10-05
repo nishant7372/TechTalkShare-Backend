@@ -11,6 +11,8 @@ const html2md = require("html-to-md");
 const RecentItem = require("../models/recentItem");
 
 const obj = require("./../index");
+const StarredItem = require("../models/starredItem");
+const PinnedItem = require("../models/pinnedItem");
 
 // article creation endpoint (with Auth)
 
@@ -143,21 +145,28 @@ router.patch("/article/:id", auth, async (req, res) => {
   }
 });
 
+const cleanup = async (id) => {
+  await Sharing.deleteMany({
+    article: id,
+  });
+  await RecentItem.deleteOne({
+    article: id,
+  });
+};
+
 // single article deleting endpoint (with Auth)
 
 router.delete("/article/:id", auth, async (req, res) => {
   try {
-    await Sharing.deleteMany({
-      article: req.params.id,
-    });
     const article = await Article.findOneAndDelete({
-      _id: req.params.id,
-      owner: req.user._id,
+      _id: req?.params.id,
+      owner: req?.user._id,
     }).lean();
 
     if (!article) {
       return res.status(404).send({ message: "Article Not Found" });
     }
+    await cleanup(req?.params?.id);
     res.status(200).send({ ok: "Article Successfully Deleted" });
   } catch (error) {
     res.status(500).send({ message: error.message });
@@ -174,7 +183,7 @@ process.setMaxListeners(1000);
 
 router.get("/scrape", auth, async (req, res) => {
   try {
-    const url = sanitizeUrl(req.query.url);
+    const url = sanitizeUrl(req?.query?.url);
     if (!isValidUrl(url)) {
       return res.status(400).send({ message: "Invalid URL!" });
     }

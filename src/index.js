@@ -41,6 +41,14 @@ const connectedClients = new Map();
 const chatClients = new Map();
 const chatClientsManager = new Map();
 
+app.get("/serverCheck", async (req, res) => {
+  try {
+    res.status(200).send({ ok: "Server is running" });
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
 io.on("connection", (socket) => {
   console.log("New Websocket connnection! SocketId:", socket.id);
   const socketId = socket.id;
