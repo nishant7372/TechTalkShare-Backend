@@ -92,7 +92,7 @@ router.delete("/users/me/avatar", auth, async (req, res) => {
     req.user.avatar = undefined;
     await req.user.save();
     res.send();
-  } catch (e) {
+  } catch (error) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -106,7 +106,7 @@ router.get("/users/:id/avatar", async (req, res) => {
     }
     res.set("Content-Type", "image/png"); // by default application/json
     res.send(user.avatar);
-  } catch (e) {
+  } catch (error) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -122,7 +122,7 @@ router.post("/users/logout", auth, async (req, res) => {
     );
     await req.user.save();
     res.send();
-  } catch (e) {
+  } catch (error) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -137,7 +137,7 @@ router.post("/users/logout/:id", auth, async (req, res) => {
     );
     await req.user.save();
     res.send();
-  } catch (e) {
+  } catch (error) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -151,7 +151,7 @@ router.post("/users/logoutAllOther", auth, async (req, res) => {
     );
     await req.user.save();
     res.send();
-  } catch (e) {
+  } catch (error) {
     res.status(500).send({ message: error.message });
   }
 });
