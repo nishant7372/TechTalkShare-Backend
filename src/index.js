@@ -16,7 +16,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 const corsOptions = {
-  origin: ["http://localhost:3001", "https://d3vstore.netlify.app"],
+  origin: [
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "https://d3vstore.netlify.app",
+    "https://techtalkshare.netlify.app",
+  ],
   methods: "*",
 };
 

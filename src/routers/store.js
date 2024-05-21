@@ -159,7 +159,9 @@ router.post("/folder", auth, async (req, res) => {
     await folder.save();
     res.send({ ok: "Folder Created" });
   } catch (err) {
-    res.status(400).send({ message: err.message });
+    if (err.code === 11000 || err.code === 11001) {
+      res.status(400).send({ message: "Folder already exists" });
+    } else res.status(400).send({ message: err.message });
   }
 });
 
