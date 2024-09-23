@@ -1,10 +1,11 @@
 const mongoose = require("mongoose");
+const endpoints = require("../constants/endpoints");
 
 mongoose.set("strictQuery", false);
 
 async function connectToDatabase() {
   try {
-    await mongoose.connect(process.env.MONGODB_DEV_URL, {
+    await mongoose.connect(endpoints?.mongo_db_url, {
       useNewUrlParser: true,
     });
     console.log("Connected to MongoDB");

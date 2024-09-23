@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const Article = require("./article");
 const Sharing = require("./sharing");
 const Download = require("./download");
+const endpoints = require("../constants/endpoints");
 
 const userSchema = new mongoose.Schema(
   {
@@ -101,7 +102,7 @@ userSchema.methods.generateAuthToken = async function (
   model
 ) {
   const user = this;
-  const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
+  const token = jwt.sign({ _id: user._id }, endpoints?.jwt_secret);
 
   const osDetails = { osname, model, browser };
   const session = { osDetails, creationTime };

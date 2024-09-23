@@ -9,21 +9,15 @@ const avatarRouter = require("./routers/avatar");
 const Message = require("./models/message");
 const storeRouter = require("./routers/store");
 const socketio = require("socket.io");
+const endpoints = require("../src/constants/endpoints");
 
 const cors = require("cors");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = endpoints?.port || 3000;
 
 const corsOptions = {
-  origin: [
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:8000",
-    "http://localhost:8001",
-    "https://d3vstore.netlify.app",
-    "https://techtalkshare.netlify.app",
-  ],
+  origin: endpoints?.cors_origin,
   methods: "*",
 };
 
