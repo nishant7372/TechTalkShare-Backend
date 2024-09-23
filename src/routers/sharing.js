@@ -37,11 +37,11 @@ router.post("/articles/share", auth, async (req, res) => {
       }
     }
 
-    if (sharingErrors.length > 0) {
+    if (sharingErrors?.length > 0) {
       return res.status(400).send({ message: sharingErrors });
     }
 
-    res.status(200).send({ message: "Articles shared successfully" });
+    res.status(200).send({ ok: "Article shared successfully" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -84,11 +84,11 @@ const share = async (userId, req) => {
 router.get("/shared", auth, async (req, res) => {
   const sort = {};
   const options = {
-    limit: parseInt(req.query.limit),
-    skip: parseInt(req.query.skip),
+    limit: parseInt(req?.query?.limit),
+    skip: parseInt(req?.query?.skip),
   };
 
-  if (req.query.sortBy) {
+  if (req?.query?.sortBy) {
     const parts = req.query.sortBy.split(":");
     sort[parts[0]] = parts[1] == "desc" ? -1 : 1;
   }
@@ -140,7 +140,9 @@ router.get("/shared", auth, async (req, res) => {
 
     const articleCount = articles.length;
 
-    articles = articles.slice(options.skip, options.limit + options.skip);
+    if (options?.skip && options?.limit) {
+      articles = articles.slice(options?.skip, options?.limit + options?.skip);
+    }
     articles = articles.map((articleObj) => {
       const { editPermission, article, message, createdAt } = articleObj;
       const { topic, tags, downloaded, owner, updatedAt, _id } = article;
@@ -157,9 +159,10 @@ router.get("/shared", auth, async (req, res) => {
       };
     });
 
-    res.send({
+    res.status(200).send({
       articles: articles,
       articleCount,
+      ok: true,
     });
   } catch (error) {
     return res.status(400).send({ message: error.message });
@@ -182,7 +185,7 @@ router.get("/shared/:id", auth, async (req, res) => {
     if (!article) {
       return res.status(404).send({ message: "Article Not Found" });
     }
-    res.send({ article, sharing });
+    res.status(200).send({ article, sharing, ok: true });
   } catch (error) {
     return res.status(500).send();
   }
@@ -230,7 +233,7 @@ router.patch("/shared/:id", auth, async (req, res) => {
 
     updates.forEach((update) => (article[update] = req.body[update]));
     await article.save();
-    res.status(200).send();
+    res.status(200).send({ ok: "Article Successfully Updated" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -260,7 +263,7 @@ router.get("/sharings/:id", auth, async (req, res) => {
       })
       .lean();
 
-    res.send({ sharings });
+    res.status(200).send({ sharings, ok: true });
   } catch (error) {
     return res
       .status(500)
@@ -302,7 +305,7 @@ router.patch("/sharing/:id", auth, async (req, res) => {
     updates.forEach((update) => (sharing[update] = req.body[update]));
     await sharing.save();
 
-    res.status(200).send();
+    res.status(200).send({ ok: "Permissions updated Successfully" });
   } catch (error) {
     return res.status(400).send({ message: error.message });
   }
@@ -332,7 +335,7 @@ router.delete("/sharing/:id", auth, async (req, res) => {
       _id: id,
     });
 
-    res.status(200).send();
+    res.status(200).send({ ok: "Sharing Record Deleted" });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }

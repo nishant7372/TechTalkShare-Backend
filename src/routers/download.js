@@ -9,7 +9,7 @@ router.get("/downloads", auth, async (req, res) => {
     const downloads = await Download.find({
       owner: req.user._id,
     });
-    res.send(downloads);
+    res.status(200).send({ downloads, ok: true });
   } catch (error) {
     res.status(400).send({ message: error.message });
   }
@@ -25,9 +25,9 @@ router.delete("/downloads/:id", auth, async (req, res) => {
     if (!download) {
       return res.status(404).send({ message: "Download Record Not Found" });
     }
-    res.send(download);
+    res.status(200).send({ ok: "Record Successfully Deleted" });
   } catch (error) {
-    res.status(500).send({ message: error.message });
+    res.status(500).send({ message: error?.message });
   }
 });
 

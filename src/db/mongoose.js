@@ -4,7 +4,7 @@ mongoose.set("strictQuery", false);
 
 async function connectToDatabase() {
   try {
-    await mongoose.connect(process.env.MONGODB_PROD_URL, {
+    await mongoose.connect(process.env.MONGODB_DEV_URL, {
       useNewUrlParser: true,
     });
     console.log("Connected to MongoDB");

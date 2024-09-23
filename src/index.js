@@ -5,7 +5,9 @@ const { router: articleRouter, activeDownloads } = require("./routers/article");
 const sharingRouter = require("./routers/sharing");
 const downloadRouter = require("./routers/download");
 const messageRouter = require("./routers/message");
+const avatarRouter = require("./routers/avatar");
 const Message = require("./models/message");
+const storeRouter = require("./routers/store");
 const socketio = require("socket.io");
 
 const cors = require("cors");
@@ -16,6 +18,9 @@ const port = process.env.PORT || 3000;
 const corsOptions = {
   origin: [
     "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:8000",
+    "http://localhost:8001",
     "https://d3vstore.netlify.app",
     "https://techtalkshare.netlify.app",
   ],
@@ -30,6 +35,8 @@ app.use(articleRouter); // regstering article router
 app.use(sharingRouter); // regstering sharing router
 app.use(downloadRouter); // registering download Router
 app.use(messageRouter); // registering message Router
+app.use(storeRouter); // registering store Router
+app.use(avatarRouter); //registering avatar Router
 
 const server = app.listen(port, () => {
   console.log("Server is up on the port " + port);
@@ -40,6 +47,14 @@ const io = socketio(server, { cors: corsOptions });
 const connectedClients = new Map();
 const chatClients = new Map();
 const chatClientsManager = new Map();
+
+app.get("/serverCheck", async (req, res) => {
+  try {
+    res.status(200).send({ ok: "Server is running" });
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
 
 io.on("connection", (socket) => {
   console.log("New Websocket connnection! SocketId:", socket.id);

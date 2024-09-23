@@ -1,8 +1,6 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const User = require("../models/user");
-const multer = require("multer");
-const sharp = require("sharp");
 
 const router = new express.Router();
 
@@ -25,7 +23,7 @@ router.post("/users", async (req, res) => {
     );
     await user.save();
     // 201 -> created
-    res.status(201).send({ user, token });
+    res.status(201).send({ user, token, ok: "Signup Successful" });
   } catch (error) {
     // 400 -> bad request (invalid data)
     res.status(400).send({ message: error.message });
@@ -44,70 +42,10 @@ router.post("/users/login", async (req, res) => {
       browser,
       model
     );
-    res.send({ user, token });
+    res.status(200).send({ user, token, ok: "Login Successful" });
   } catch (error) {
     // 400 -> bad request (invalid request)
     res.status(400).send({ message: error.message });
-  }
-});
-
-// Avatar Upload, Delete and Fetch Endpoint  -----------------------------
-
-// validating avatar upload using multer
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 1000000, // 1MB
-  },
-  fileFilter(req, file, cb) {
-    if (!file.originalname.match(/\.(jpg|png|jpeg)$/)) {
-      return cb(new Error("Please upload an image"));
-    }
-    cb(undefined, true);
-  },
-});
-
-// avatar upload endpoint (with Auth)
-router.post(
-  "/users/me/avatar",
-  auth,
-  upload.single("avatar"),
-  async (req, res) => {
-    const buffer = await sharp(req.file.buffer)
-      .resize({ width: 250, height: 250 })
-      .png()
-      .toBuffer();
-    req.user.avatar = buffer;
-    await req.user.save();
-    res.send();
-  },
-  (error, req, res, next) => {
-    res.status(400).send({ message: error.message });
-  }
-);
-
-// avatar delete endpoint (with Auth)
-router.delete("/users/me/avatar", auth, async (req, res) => {
-  try {
-    req.user.avatar = undefined;
-    await req.user.save();
-    res.send();
-  } catch (error) {
-    res.status(500).send({ message: error.message });
-  }
-});
-
-// avatar fetching endpoint by user id
-router.get("/users/:id/avatar", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user || !user.avatar) {
-      res.status(404).send({ message: "User/Avatar Not Found" });
-    }
-    res.set("Content-Type", "image/png"); // by default application/json
-    res.send(user.avatar);
-  } catch (error) {
-    res.status(500).send({ message: error.message });
   }
 });
 
@@ -121,8 +59,8 @@ router.post("/users/logout", auth, async (req, res) => {
       (session) => session.token != req.token
     );
     await req.user.save();
-    res.send();
-  } catch (error) {
+    res.status(200).send({ ok: "Logout Successful" });
+  } catch (e) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -136,8 +74,8 @@ router.post("/users/logout/:id", auth, async (req, res) => {
       (session) => session._id.toString() != id
     );
     await req.user.save();
-    res.send();
-  } catch (error) {
+    res.status(200).send({ ok: "Logout Successful" });
+  } catch (e) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -150,8 +88,8 @@ router.post("/users/logoutAllOther", auth, async (req, res) => {
       (session) => session.token == req.token
     );
     await req.user.save();
-    res.send();
-  } catch (error) {
+    res.status(200).send({ ok: "Logout Successful" });
+  } catch (e) {
     res.status(500).send({ message: error.message });
   }
 });
@@ -165,7 +103,7 @@ router.get("/users/me", auth, async (req, res) => {
     const session = req.user.sessions.find(
       (session) => session.token == req.token
     );
-    res.send({ user: req.user, currentSessionId: session.id });
+    res.send({ user: req?.user, currentSessionId: session?.id, ok: true });
   } catch (error) {
     // internal server error / server down
     res.status(500).send({ message: error.message });
@@ -175,7 +113,7 @@ router.get("/users/me", auth, async (req, res) => {
 // single user updating endpoint (Update user)
 
 router.patch("/users/me", auth, async (req, res) => {
-  const updates = Object.keys(req.body);
+  const updates = Object.keys(req?.body);
   const allowedUpdates = ["name", "userName", "password", "age"];
   const isValidOperation = updates.every((update) =>
     allowedUpdates.includes(update)
@@ -187,7 +125,13 @@ router.patch("/users/me", auth, async (req, res) => {
   try {
     updates.forEach((update) => (req.user[update] = req.body[update]));
     await req.user.save();
-    res.status(200).send();
+    res
+      .status(200)
+      .send(
+        updates?.[0] === "password"
+          ? { ok: "Password updated Successfully" }
+          : { ok: "User Updated Successfully" }
+      );
   } catch (error) {
     // 400 -> bad request (invalid request)
     return res.status(400).send({ message: error.message });
@@ -199,7 +143,7 @@ router.patch("/users/me", auth, async (req, res) => {
 router.delete("/users/me", auth, async (req, res) => {
   try {
     await req.user.remove();
-    res.send(req.user);
+    res.status(200).send({ ok: "User Account Deleted Successfully" });
   } catch (error) {
     // internal server error / server down
     res.status(500).send({ message: error.message });
@@ -211,7 +155,7 @@ router.delete("/users/me", auth, async (req, res) => {
 router.get("/users", auth, async (req, res) => {
   try {
     const users = await User.find({}, "name userName avatar");
-    res.send(users);
+    res.status(200).send({ ok: true, users });
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
@@ -224,9 +168,9 @@ router.get("/user/:userName", auth, async (req, res) => {
   try {
     const user = await User.findOne({ userName }, "name userName avatar");
     if (!user) {
-      return res.status(404).send({ message: "No User Found" });
+      return res.status(404).send({ message: "User not Found" });
     }
-    res.send(user);
+    res.status(200).send({ ok: true, user });
   } catch (error) {
     return res.status(500).send({ message: error.message });
   }
